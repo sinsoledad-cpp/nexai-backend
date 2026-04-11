@@ -1,20 +1,22 @@
 package startup
 
-// import (
-// 	"nexai-backend/internal/web"
-// 	"nexai-backend/internal/web/middleware"
-// 	jwtware "nexai-backend/internal/web/middleware/jwt"
-// 	"path/filepath"
-//
-// 	"github.com/gin-gonic/gin"
-// )
+import (
+	jwtware "nexai-backend/internal/common/jwt"
+	"nexai-backend/internal/user/handler"
+	"path/filepath"
 
-// func InitGinServer(hdl *web.UserHandler, jwtHdl jwtware.Handler) *gin.Engine {
-// 	gin.SetMode(gin.ReleaseMode)
-// 	server := gin.Default()
-// 	server.Static("/uploads", filepath.Join(projectRoot(), "storage", "uploads"))
-// 	m := middleware.NewJWTAuth(jwtHdl)
-// 	server.Use(m.Middleware())
-// 	hdl.RegisterRoutes(server)
-// 	return server
-// }
+	"github.com/gin-gonic/gin"
+)
+
+func projectRoot() string {
+	return "../.."
+}
+
+func InitGinServer(hdl *handler.UserHandler, jwtHdl jwtware.Handler) *gin.Engine {
+	gin.SetMode(gin.ReleaseMode)
+	server := gin.Default()
+	server.Static("/uploads", filepath.Join(projectRoot(), "storage", "uploads"))
+	// 暂时不使用 JWT 中间件，因为测试中会手动设置 token
+	hdl.RegisterRoutes(server)
+	return server
+}

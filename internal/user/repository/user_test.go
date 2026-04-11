@@ -319,63 +319,6 @@ func TestCachedUserRepository_FindByPhone(t *testing.T) {
 	}
 }
 
-func TestCachedUserRepository_FindByWechat(t *testing.T) {
-	t.Parallel()
-	now := time.Now()
-	now = time.UnixMilli(now.UnixMilli())
-
-	testCases := []struct {
-		name     string
-		mock     func(ctrl *gomock.Controller) (dao.UserDAO, *cachemocks.MockUserCache)
-		ctx      context.Context
-		openid   string
-		wantErr  error
-		wantUser domain.User
-	}{
-		{
-			name:   "success",
-			ctx:    context.Background(),
-			openid: "openid",
-			mock: func(ctrl *gomock.Controller) (dao.UserDAO, *cachemocks.MockUserCache) {
-				d := daomocks.NewMockUserDAO(ctrl)
-				c := cachemocks.NewMockUserCache(ctrl)
-				d.EXPECT().FindByWechat(gomock.Any(), "openid").Return(dao.User{
-					ID: 1,
-					WechatOpenId: sql.NullString{
-						String: "openid",
-						Valid:  true,
-					},
-					Ctime: now.UnixMilli(),
-				}, nil)
-				return d, c
-			},
-			wantUser: domain.User{
-				ID:    1,
-				Ctime: now,
-				WechatInfo: domain.WechatInfo{
-					OpenID: "openid",
-				},
-			},
-			wantErr: nil,
-		},
-	}
-
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			d, c := tc.mock(ctrl)
-			repo := NewCachedUserRepository(d, c, logger.NewNopLogger())
-			user, err := repo.FindByWechat(tc.ctx, tc.openid)
-			assert.Equal(t, tc.wantErr, err)
-			assert.Equal(t, tc.wantUser, user)
-		})
-	}
-}
-
 func TestCachedUserRepository_UpdateAvatar(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {

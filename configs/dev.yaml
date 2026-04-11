@@ -9,10 +9,10 @@ log:
   max_backups: 5  # 最多保留 5 个备份文件
 
 mysql:
-  dsn: "root:root@tcp(127.0.0.1:3306)/bedrock?charset=utf8mb4&parseTime=True&loc=Local"
+  dsn: "root:root@tcp(127.0.0.1:13306)/nexai?charset=utf8mb4&parseTime=True&loc=Local"
 
 redis:
-  address: "127.0.0.1:6379"
+  address: "127.0.0.1:16379"
 
 kafka:
   addr:

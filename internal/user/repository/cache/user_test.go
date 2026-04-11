@@ -3,7 +3,7 @@ package cache
 import (
 	"context"
 	"errors"
-	"nexai-backend/internal/domain"
+	"nexai-backend/internal/user/domain"
 	"testing"
 	"time"
 

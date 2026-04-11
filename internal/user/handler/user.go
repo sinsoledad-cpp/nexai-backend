@@ -5,6 +5,7 @@ import (
 	"net/http"
 	codeservice "nexai-backend/internal/code/service"
 	jwtware "nexai-backend/internal/common/jwt"
+	"nexai-backend/internal/common/router"
 	"nexai-backend/internal/user/domain"
 	"nexai-backend/internal/user/handler/errs"
 	userservice "nexai-backend/internal/user/service"
@@ -17,7 +18,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var _ Handler = (*UserHandler)(nil)
+var _ router.Handler = (*UserHandler)(nil)
 
 const (
 	emailRegexPattern    = "(?i)^[A-Z0-9_!#$%&'*+/=?`{|}~^.-]+@[A-Z0-9.-]+$"

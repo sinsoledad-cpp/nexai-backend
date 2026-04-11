@@ -2,7 +2,6 @@ package ioc
 
 import (
 	"fmt"
-	"nexai-backend/internal/user/repository/dao"
 	"nexai-backend/pkg/logger"
 
 	"github.com/spf13/viper"
@@ -36,7 +35,7 @@ func InitMySQL(l logger.Logger) *gorm.DB {
 	if err != nil {
 		panic(err)
 	}
-	if err = dao.InitTables(db); err != nil {
+	if err = InitDatabase(db); err != nil {
 		panic(err)
 	}
 	return db

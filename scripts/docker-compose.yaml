@@ -1,4 +1,4 @@
-name: bedrock
+name: nexai
 
 networks:
   net01:
@@ -11,16 +11,16 @@ services:
   # todo sudo rm -rf mysql ; sudo mkdir -p mysql/data mysql/conf  && sudo chown -R 1001:1001 mysql &&  sudo docker pull registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/mysql:8.0 && sudo docker tag registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/mysql:8.0 bitnami/mysql:8.0
   mysql:
     image: bitnami/mysql:8.0  # sudo docker pull registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/mysql:8.0 && sudo docker tag registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/mysql:8.0 bitnami/mysql:8.0
-    container_name: bedrock-mysql # 强制指定容器的名称为 mysql
+    container_name: nexai-mysql # 强制指定容器的名称为 mysql
     hostname: mysql # 设置容器内部的主机名为 mysql
     restart: unless-stopped
 #    privileged: true # 特权模式
     ports:
-      - "3306:3306"
+      - "13306:3306"
     environment:
       TZ: Asia/Shanghai
       MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: bedrock # 自动创建数据库 bedrock
+      MYSQL_DATABASE: nexai # 自动创建数据库 nexai
 #    volumes:
 #      - "./mysql/data:/bitnami/mysql/data" # sudo rm -rf mysql ; sudo mkdir mysql && sudo chown -R 1001:1001 mysql
 #      - "./mysql/conf:/opt/bitnami/mysql/conf"
@@ -34,11 +34,11 @@ services:
 #----------------------------------------------------------------------------------------------
   redis:
     image: "bitnami/redis:latest"
-    container_name: bedrock-redis # 强制指定容器的名称为 mysql
+    container_name: nexai-redis # 强制指定容器的名称为 mysql
     hostname: redis # 设置容器内部的主机名为 mysql
     restart: unless-stopped
     ports:
-      - '6379:6379'
+      - '16379:6379'
     environment:
       - ALLOW_EMPTY_PASSWORD=yes
     networks:
@@ -48,7 +48,7 @@ services:
 #  # todo sudo rm -rf jaeger ; mkdir jaeger && chown -R 1001:1001 jaeger && sudo docker pull registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/jaeger:1 && sudo docker tag registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/jaeger:1 bitnami/jaeger:1
 #  jaeger:
 #    image: bitnami/jaeger:latest # sudo docker pull registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/jaeger:1 && sudo docker tag registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/jaeger:1 bitnami/jaeger:1
-#    container_name: bedrock-jaeger
+#    container_name: nexai-jaeger
 #    hostname: jaeger # 设置容器内部的主机名为 jaeger
 #    restart: unless-stopped
 #    ports:
@@ -78,33 +78,33 @@ services:
 # Jaeger (链路追踪)
 # 使用官方 All-in-One 镜像，替代 bitnami/jaeger
 # ---------------------------------------------------------------------------
-  jaeger:
-    # 官方镜像，集成了 UI、Collector、Query 和 Agent
-    image: jaegertracing/all-in-one:1.55
-    container_name: bedrock-jaeger
-    hostname: jaeger
-    restart: unless-stopped
-    ports:
-      # 1. Web UI 端口 (浏览器访问 http://localhost:16686)
-      - "16686:16686"
-      # 2. OTLP 协议端口 (你的 Go 代码主要用这个)
-      - "4317:4317"   # gRPC
-      - "4318:4318"   # HTTP
-      # 3. 兼容性端口
-      - "9411:9411"   # Zipkin 兼容
-      - "14250:14250" # Model 端口
-    environment:
-      - COLLECTOR_ZIPKIN_HOST_PORT=:9411 # 开启 Zipkin 收集器支持 (默认可能开启，显式加上更保险)
-      - LOG_LEVEL=debug
-    networks:
-      - net01
-  # Zipkin 服务
-  zipkin:
-    image: openzipkin/zipkin-slim:2.24
-    container_name: bedrock-zipkin
-    hostname: zipkin
-    restart: unless-stopped
-    ports:
-      - '19411:9411'
-    networks:
-      - net01
+#  jaeger:
+#    # 官方镜像，集成了 UI、Collector、Query 和 Agent
+#    image: jaegertracing/all-in-one:1.55
+#    container_name: nexai-jaeger
+#    hostname: jaeger
+#    restart: unless-stopped
+#    ports:
+#      # 1. Web UI 端口 (浏览器访问 http://localhost:16686)
+#      - "16686:16686"
+#      # 2. OTLP 协议端口 (你的 Go 代码主要用这个)
+#      - "4317:4317"   # gRPC
+#      - "4318:4318"   # HTTP
+#      # 3. 兼容性端口
+#      - "9411:9411"   # Zipkin 兼容
+#      - "14250:14250" # Model 端口
+#    environment:
+#      - COLLECTOR_ZIPKIN_HOST_PORT=:9411 # 开启 Zipkin 收集器支持 (默认可能开启，显式加上更保险)
+#      - LOG_LEVEL=debug
+#    networks:
+#      - net01
+#  # Zipkin 服务
+#  zipkin:
+#    image: openzipkin/zipkin-slim:2.24
+#    container_name: nexai-zipkin
+#    hostname: zipkin
+#    restart: unless-stopped
+#    ports:
+#      - '19411:9411'
+#    networks:
+#      - net01

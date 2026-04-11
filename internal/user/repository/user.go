@@ -15,10 +15,9 @@ import (
 )
 
 var (
-	ErrDuplicatePhone  = dao.ErrDuplicatePhone
-	ErrDuplicateEmail  = dao.ErrDuplicateEmail
-	ErrDuplicateWechat = dao.ErrDuplicateWechat
-	ErrUserNotFound    = dao.ErrRecordNotFound
+	ErrDuplicatePhone = dao.ErrDuplicatePhone
+	ErrDuplicateEmail = dao.ErrDuplicateEmail
+	ErrUserNotFound   = dao.ErrRecordNotFound
 )
 
 //go:generate mockgen -source=./user.go -package=mocks -destination=./mocks/user_mock.go UserRepository
@@ -30,7 +29,6 @@ type UserRepository interface {
 	FindByPhone(ctx context.Context, phone string) (domain.User, error)
 
 	FindById(ctx context.Context, uID int64) (domain.User, error)
-	FindByWechat(ctx context.Context, openID string) (domain.User, error)
 }
 
 type CachedUserRepository struct {
@@ -185,13 +183,6 @@ func (c *CachedUserRepository) FindById(ctx context.Context, uid int64) (domain.
 //			return domain.User{}, err
 //		}
 //	}
-func (c *CachedUserRepository) FindByWechat(ctx context.Context, openID string) (domain.User, error) {
-	ue, err := c.dao.FindByWechat(ctx, openID)
-	if err != nil {
-		return domain.User{}, err
-	}
-	return c.toDomain(ue), nil
-}
 
 func (c *CachedUserRepository) toEntity(user domain.User) dao.User {
 	return dao.User{
@@ -209,15 +200,7 @@ func (c *CachedUserRepository) toEntity(user domain.User) dao.User {
 			Int64: user.Birthday.UnixMilli(),
 			Valid: !user.Birthday.IsZero(), // 表示这个值是有效的，不是 NULL
 		},
-		Avatar: user.Avatar,
-		WechatUnionId: sql.NullString{
-			String: user.WechatInfo.UnionID,
-			Valid:  user.WechatInfo.UnionID != "",
-		},
-		WechatOpenId: sql.NullString{
-			String: user.WechatInfo.OpenID,
-			Valid:  user.WechatInfo.OpenID != "",
-		},
+		Avatar:   user.Avatar,
 		AboutMe:  user.AboutMe,
 		Nickname: user.Nickname,
 	}
@@ -238,9 +221,5 @@ func (c *CachedUserRepository) toDomain(u dao.User) domain.User {
 		Birthday: birthday,
 		Avatar:   u.Avatar,
 		Ctime:    time.UnixMilli(u.Ctime),
-		WechatInfo: domain.WechatInfo{
-			OpenID:  u.WechatOpenId.String,
-			UnionID: u.WechatUnionId.String,
-		},
 	}
 }

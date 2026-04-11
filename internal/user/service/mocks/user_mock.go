@@ -71,21 +71,6 @@ func (mr *MockUserServiceMockRecorder) FindOrCreate(ctx, phone any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindOrCreate", reflect.TypeOf((*MockUserService)(nil).FindOrCreate), ctx, phone)
 }
 
-// FindOrCreateByWechat mocks base method.
-func (m *MockUserService) FindOrCreateByWechat(ctx context.Context, wechatInfo domain.WechatInfo) (domain.User, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "FindOrCreateByWechat", ctx, wechatInfo)
-	ret0, _ := ret[0].(domain.User)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// FindOrCreateByWechat indicates an expected call of FindOrCreateByWechat.
-func (mr *MockUserServiceMockRecorder) FindOrCreateByWechat(ctx, wechatInfo any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "FindOrCreateByWechat", reflect.TypeOf((*MockUserService)(nil).FindOrCreateByWechat), ctx, wechatInfo)
-}
-
 // Login mocks base method.
 func (m *MockUserService) Login(ctx context.Context, email, password string) (domain.User, error) {
 	m.ctrl.T.Helper()
@@ -101,6 +86,34 @@ func (mr *MockUserServiceMockRecorder) Login(ctx, email, password any) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Login", reflect.TypeOf((*MockUserService)(nil).Login), ctx, email, password)
 }
 
+// ResetPasswordByEmail mocks base method.
+func (m *MockUserService) ResetPasswordByEmail(ctx context.Context, email, password string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResetPasswordByEmail", ctx, email, password)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ResetPasswordByEmail indicates an expected call of ResetPasswordByEmail.
+func (mr *MockUserServiceMockRecorder) ResetPasswordByEmail(ctx, email, password any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetPasswordByEmail", reflect.TypeOf((*MockUserService)(nil).ResetPasswordByEmail), ctx, email, password)
+}
+
+// ResetPasswordByPhone mocks base method.
+func (m *MockUserService) ResetPasswordByPhone(ctx context.Context, phone, password string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResetPasswordByPhone", ctx, phone, password)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ResetPasswordByPhone indicates an expected call of ResetPasswordByPhone.
+func (mr *MockUserServiceMockRecorder) ResetPasswordByPhone(ctx, phone, password any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetPasswordByPhone", reflect.TypeOf((*MockUserService)(nil).ResetPasswordByPhone), ctx, phone, password)
+}
+
 // Signup mocks base method.
 func (m *MockUserService) Signup(ctx context.Context, user domain.User) error {
 	m.ctrl.T.Helper()
@@ -113,20 +126,6 @@ func (m *MockUserService) Signup(ctx context.Context, user domain.User) error {
 func (mr *MockUserServiceMockRecorder) Signup(ctx, user any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Signup", reflect.TypeOf((*MockUserService)(nil).Signup), ctx, user)
-}
-
-// ResetPasswordByPhone mocks base method.
-func (m *MockUserService) ResetPasswordByPhone(ctx context.Context, phone string, password string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ResetPasswordByPhone", ctx, phone, password)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ResetPasswordByPhone indicates an expected call of ResetPasswordByPhone.
-func (mr *MockUserServiceMockRecorder) ResetPasswordByPhone(ctx, phone, password any) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetPasswordByPhone", reflect.TypeOf((*MockUserService)(nil).ResetPasswordByPhone), ctx, phone, password)
 }
 
 // UpdateAvatarPath mocks base method.

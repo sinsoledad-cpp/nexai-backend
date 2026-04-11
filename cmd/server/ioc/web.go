@@ -22,7 +22,6 @@ func InitWebEngine(middlewares []gin.HandlerFunc, l logger.Logger, userHdl *hand
 	engine.Static("/uploads", "./storage/uploads")
 	engine.Use(middlewares...)
 	userHdl.RegisterRoutes(engine)
-	//wechatHdl.RegisterRoutes(engine)//, wechatHdl *web.OAuth2WechatHandler
 	return engine
 }
 

@@ -42,7 +42,7 @@ func (s *UserTestSuite) SetupSuite() {
 	// 初始化数据
 	// 确保测试数据不存在
 	// 初始化表结构
-	if err := dao.InitTables(s.db); err != nil {
+	if err := s.db.AutoMigrate(&dao.User{}); err != nil {
 		s.T().Fatal(err)
 	}
 }
@@ -80,7 +80,7 @@ func (s *UserTestSuite) TestSignUp() {
 				// 清理数据
 				s.db.Where("email = ?", "test_signup_success@example.com").Delete(&dao.User{})
 			},
-			req: web.SignUpReq{
+			req: handler.SignUpReq{
 				Email:           "test_signup_success@example.com",
 				Password:        "Password123!",
 				ConfirmPassword: "Password123!",
@@ -90,7 +90,7 @@ func (s *UserTestSuite) TestSignUp() {
 		},
 		{
 			name: "邮箱格式错误",
-			req: web.SignUpReq{
+			req: handler.SignUpReq{
 				Email:           "invalid-email",
 				Password:        "Password123!",
 				ConfirmPassword: "Password123!",
@@ -100,7 +100,7 @@ func (s *UserTestSuite) TestSignUp() {
 		},
 		{
 			name: "两次密码不一致",
-			req: web.SignUpReq{
+			req: handler.SignUpReq{
 				Email:           "test2@example.com",
 				Password:        "Password123!",
 				ConfirmPassword: "Password1234!",
@@ -125,7 +125,7 @@ func (s *UserTestSuite) TestSignUp() {
 				// 清理数据
 				s.db.Where("email = ?", "duplicate@example.com").Delete(&dao.User{})
 			},
-			req: web.SignUpReq{
+			req: handler.SignUpReq{
 				Email:           "duplicate@example.com",
 				Password:        "Password123!",
 				ConfirmPassword: "Password123!",
@@ -203,7 +203,7 @@ func (s *UserTestSuite) TestLogin() {
 			after: func(t *testing.T) {
 				s.db.Where("email = ?", "test_login_success@example.com").Delete(&dao.User{})
 			},
-			req: web.LoginJWTReq{
+			req: handler.LoginJWTReq{
 				Email:    "test_login_success@example.com",
 				Password: "Password123!",
 			},
@@ -216,7 +216,7 @@ func (s *UserTestSuite) TestLogin() {
 			},
 			after: func(t *testing.T) {
 			},
-			req: web.LoginJWTReq{
+			req: handler.LoginJWTReq{
 				Email:    "test_login_not_found@example.com",
 				Password: "Password123!",
 			},
@@ -241,7 +241,7 @@ func (s *UserTestSuite) TestLogin() {
 			after: func(t *testing.T) {
 				s.db.Where("email = ?", "test_login_wrong_password@example.com").Delete(&dao.User{})
 			},
-			req: web.LoginJWTReq{
+			req: handler.LoginJWTReq{
 				Email:    "test_login_wrong_password@example.com",
 				Password: "WrongPassword!",
 			},
@@ -323,7 +323,7 @@ func (s *UserTestSuite) TestEdit() {
 				// 清理数据
 				s.db.Where("email = ?", "test_edit_success@example.com").Delete(&dao.User{})
 			},
-			req: web.UserEditReq{
+			req: handler.UserEditReq{
 				Nickname: "new_nickname",
 				AboutMe:  "new_about_me",
 				Birthday: "2000-01-01",
@@ -407,7 +407,7 @@ func (s *UserTestSuite) TestProfile() {
 			},
 			wantCode: 200,
 			wantMsg:  "获取用户信息成功",
-			wantData: web.ProfileVO{
+			wantData: handler.ProfileVO{
 				Email:    "test_profile_success@example.com",
 				Nickname: "test_nick",
 				AboutMe:  "test_about",

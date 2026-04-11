@@ -1,11 +1,11 @@
 package handler
 
 import (
-	"bytes"
 	"errors"
-	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	codeservice "nexai-backend/internal/code/service"
+	codemocks "nexai-backend/internal/code/service/mocks"
 	jwtware "nexai-backend/internal/common/jwt"
 	jwtmocks "nexai-backend/internal/common/jwt/mocks"
 	"nexai-backend/internal/user/domain"
@@ -158,7 +158,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 
 			svc := tc.mock(ctrl)
 			// 使用 NewUserHandler 初始化，确保正则表达式等字段被正确初始化
-			h := NewUserHandler(logger.NewNopLogger(), svc, nil, nil, nil)
+			h := NewUserHandler(logger.NewNopLogger(), svc, nil, nil)
 
 			// 构造 gin.Context
 			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
@@ -218,7 +218,7 @@ func TestUserHandler_LogoutJWT(t *testing.T) {
 			defer ctrl.Finish()
 
 			jwtHdl := tc.mock(ctrl)
-			h := NewUserHandler(logger.NewNopLogger(), nil, nil, nil, jwtHdl)
+			h := NewUserHandler(logger.NewNopLogger(), nil, nil, jwtHdl)
 
 			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 			ctx.Request = httptest.NewRequest("POST", "/users/logout", nil)
@@ -293,7 +293,7 @@ func TestUserHandler_RefreshToken(t *testing.T) {
 			defer ctrl.Finish()
 
 			jwtHdl := tc.mock(ctrl)
-			h := NewUserHandler(logger.NewNopLogger(), nil, nil, nil, jwtHdl)
+			h := NewUserHandler(logger.NewNopLogger(), nil, nil, jwtHdl)
 
 			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 			ctx.Request = httptest.NewRequest("POST", "/users/refresh_token", nil)
@@ -386,7 +386,7 @@ func TestUserHandler_LoginJWT(t *testing.T) {
 			defer ctrl.Finish()
 
 			svc, jwtHdl := tc.mock(ctrl)
-			h := NewUserHandler(logger.NewNopLogger(), svc, nil, nil, jwtHdl)
+			h := NewUserHandler(logger.NewNopLogger(), svc, nil, jwtHdl)
 
 			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 			ctx.Request = httptest.NewRequest("POST", "/users/login", nil)
@@ -463,7 +463,7 @@ func TestUserHandler_Edit(t *testing.T) {
 			defer ctrl.Finish()
 
 			svc := tc.mock(ctrl)
-			h := NewUserHandler(logger.NewNopLogger(), svc, nil, nil, nil)
+			h := NewUserHandler(logger.NewNopLogger(), svc, nil, nil)
 
 			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 			ctx.Request = httptest.NewRequest("POST", "/users/edit", nil)
@@ -480,7 +480,7 @@ func TestUserHandler_SendSMSLoginCode(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name string
-		mock func(ctrl *gomock.Controller) service.CodeService
+		mock func(ctrl *gomock.Controller) codeservice.CodeService
 		req  SendSMSCodeReq
 
 		wantResult ginx.Result
@@ -488,8 +488,8 @@ func TestUserHandler_SendSMSLoginCode(t *testing.T) {
 	}{
 		{
 			name: "发送成功",
-			mock: func(ctrl *gomock.Controller) service.CodeService {
-				svc := svcmocks.NewMockCodeService(ctrl)
+			mock: func(ctrl *gomock.Controller) codeservice.CodeService {
+				svc := codemocks.NewMockCodeService(ctrl)
 				svc.EXPECT().Send(gomock.Any(), "login", "12345678901").Return(nil)
 				return svc
 			},
@@ -504,8 +504,8 @@ func TestUserHandler_SendSMSLoginCode(t *testing.T) {
 		},
 		{
 			name: "未输入手机号码",
-			mock: func(ctrl *gomock.Controller) service.CodeService {
-				svc := svcmocks.NewMockCodeService(ctrl)
+			mock: func(ctrl *gomock.Controller) codeservice.CodeService {
+				svc := codemocks.NewMockCodeService(ctrl)
 				return svc
 			},
 			req: SendSMSCodeReq{
@@ -527,7 +527,7 @@ func TestUserHandler_SendSMSLoginCode(t *testing.T) {
 			defer ctrl.Finish()
 
 			svc := tc.mock(ctrl)
-			h := NewUserHandler(logger.NewNopLogger(), nil, svc, nil, nil)
+			h := NewUserHandler(logger.NewNopLogger(), nil, svc, nil)
 
 			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 			ctx.Request = httptest.NewRequest("POST", "/users/login_sms/code/send", nil)
@@ -544,7 +544,7 @@ func TestUserHandler_LoginSMS(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name string
-		mock func(ctrl *gomock.Controller) (service.CodeService, service.UserService, jwtware.Handler)
+		mock func(ctrl *gomock.Controller) (codeservice.CodeService, service.UserService, jwtware.Handler)
 		req  LoginSMSReq
 
 		wantResult ginx.Result
@@ -552,8 +552,8 @@ func TestUserHandler_LoginSMS(t *testing.T) {
 	}{
 		{
 			name: "登录成功",
-			mock: func(ctrl *gomock.Controller) (service.CodeService, service.UserService, jwtware.Handler) {
-				codeSvc := svcmocks.NewMockCodeService(ctrl)
+			mock: func(ctrl *gomock.Controller) (codeservice.CodeService, service.UserService, jwtware.Handler) {
+				codeSvc := codemocks.NewMockCodeService(ctrl)
 				userSvc := svcmocks.NewMockUserService(ctrl)
 				jwtHdl := jwtmocks.NewMockHandler(ctrl)
 
@@ -575,8 +575,8 @@ func TestUserHandler_LoginSMS(t *testing.T) {
 		},
 		{
 			name: "验证码不对",
-			mock: func(ctrl *gomock.Controller) (service.CodeService, service.UserService, jwtware.Handler) {
-				codeSvc := svcmocks.NewMockCodeService(ctrl)
+			mock: func(ctrl *gomock.Controller) (codeservice.CodeService, service.UserService, jwtware.Handler) {
+				codeSvc := codemocks.NewMockCodeService(ctrl)
 				userSvc := svcmocks.NewMockUserService(ctrl)
 				jwtHdl := jwtmocks.NewMockHandler(ctrl)
 
@@ -604,140 +604,12 @@ func TestUserHandler_LoginSMS(t *testing.T) {
 			defer ctrl.Finish()
 
 			codeSvc, userSvc, jwtHdl := tc.mock(ctrl)
-			h := NewUserHandler(logger.NewNopLogger(), userSvc, codeSvc, nil, jwtHdl)
+			h := NewUserHandler(logger.NewNopLogger(), userSvc, codeSvc, jwtHdl)
 
 			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 			ctx.Request = httptest.NewRequest("POST", "/users/login_sms", nil)
 
 			res, err := h.LoginSMS(ctx, tc.req)
-
-			assert.Equal(t, tc.wantErr, err)
-			assert.Equal(t, tc.wantResult, res)
-		})
-	}
-}
-
-func TestUserHandler_UploadAvatar(t *testing.T) {
-	t.Parallel()
-	testCases := []struct {
-		name     string
-		mock     func(ctrl *gomock.Controller) (service.UserService, storage.Provider)
-		uc       jwtware.UserClaims
-		setupReq func(w *multipart.Writer)
-
-		wantResult ginx.Result
-		wantErr    error
-	}{
-		{
-			name: "上传成功",
-			mock: func(ctrl *gomock.Controller) (service.UserService, storage.Provider) {
-				userSvc := svcmocks.NewMockUserService(ctrl)
-				storageSvc := storagemocks.NewMockProvider(ctrl)
-
-				storageSvc.EXPECT().Upload(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("https://example.com/avatar.jpg", nil)
-				userSvc.EXPECT().UpdateAvatarPath(gomock.Any(), int64(123), "https://example.com/avatar.jpg").Return(nil)
-
-				return userSvc, storageSvc
-			},
-			uc: jwtware.UserClaims{Uid: 123},
-			setupReq: func(w *multipart.Writer) {
-				part, _ := w.CreateFormFile("avatar", "avatar.jpg")
-				part.Write([]byte("image content"))
-			},
-			wantResult: ginx.Result{
-				Code: http.StatusOK,
-				Msg:  "头像上传成功",
-				Data: gin.H{
-					"avatar_url": "https://example.com/avatar.jpg",
-				},
-			},
-			wantErr: nil,
-		},
-		{
-			name: "未上传文件",
-			mock: func(ctrl *gomock.Controller) (service.UserService, storage.Provider) {
-				userSvc := svcmocks.NewMockUserService(ctrl)
-				storageSvc := storagemocks.NewMockProvider(ctrl)
-				return userSvc, storageSvc
-			},
-			uc: jwtware.UserClaims{Uid: 123},
-			setupReq: func(w *multipart.Writer) {
-				// 不创建文件字段
-			},
-			wantResult: ginx.Result{
-				Code: errs.UserInvalidInput,
-				Msg:  "请上传头像文件",
-			},
-			wantErr: http.ErrMissingFile,
-		},
-		{
-			name: "存储服务错误",
-			mock: func(ctrl *gomock.Controller) (service.UserService, storage.Provider) {
-				userSvc := svcmocks.NewMockUserService(ctrl)
-				storageSvc := storagemocks.NewMockProvider(ctrl)
-
-				storageSvc.EXPECT().Upload(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("", errors.New("storage error"))
-
-				return userSvc, storageSvc
-			},
-			uc: jwtware.UserClaims{Uid: 123},
-			setupReq: func(w *multipart.Writer) {
-				part, _ := w.CreateFormFile("avatar", "avatar.jpg")
-				part.Write([]byte("image content"))
-			},
-			wantResult: ginx.Result{
-				Code: http.StatusInternalServerError,
-				Msg:  "系统错误",
-			},
-			wantErr: errors.New("storage error"),
-		},
-		{
-			name: "更新用户头像路径失败",
-			mock: func(ctrl *gomock.Controller) (service.UserService, storage.Provider) {
-				userSvc := svcmocks.NewMockUserService(ctrl)
-				storageSvc := storagemocks.NewMockProvider(ctrl)
-
-				storageSvc.EXPECT().Upload(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return("https://example.com/avatar.jpg", nil)
-				userSvc.EXPECT().UpdateAvatarPath(gomock.Any(), int64(123), "https://example.com/avatar.jpg").Return(errors.New("db error"))
-				// 回滚删除
-				storageSvc.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil)
-
-				return userSvc, storageSvc
-			},
-			uc: jwtware.UserClaims{Uid: 123},
-			setupReq: func(w *multipart.Writer) {
-				part, _ := w.CreateFormFile("avatar", "avatar.jpg")
-				part.Write([]byte("image content"))
-			},
-			wantResult: ginx.Result{
-				Code: http.StatusInternalServerError,
-				Msg:  "系统错误",
-			},
-			wantErr: errors.New("db error"),
-		},
-	}
-
-	for _, tc := range testCases {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-			ctrl := gomock.NewController(t)
-			defer ctrl.Finish()
-
-			userSvc, storageSvc := tc.mock(ctrl)
-			h := NewUserHandler(logger.NewNopLogger(), userSvc, nil, storageSvc, nil)
-
-			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
-
-			body := &bytes.Buffer{}
-			writer := multipart.NewWriter(body)
-			tc.setupReq(writer)
-			writer.Close()
-
-			ctx.Request = httptest.NewRequest("POST", "/users/avatar/upload", body)
-			ctx.Request.Header.Set("Content-Type", writer.FormDataContentType())
-
-			res, err := h.UploadAvatar(ctx, tc.uc)
 
 			assert.Equal(t, tc.wantErr, err)
 			assert.Equal(t, tc.wantResult, res)
@@ -806,7 +678,7 @@ func TestUserHandler_Profile(t *testing.T) {
 			defer ctrl.Finish()
 
 			svc := tc.mock(ctrl)
-			h := NewUserHandler(logger.NewNopLogger(), svc, nil, nil, nil)
+			h := NewUserHandler(logger.NewNopLogger(), svc, nil, nil)
 
 			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 			ctx.Request = httptest.NewRequest("GET", "/users/profile", nil)
