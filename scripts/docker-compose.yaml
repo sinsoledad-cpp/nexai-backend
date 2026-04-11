@@ -1,0 +1,110 @@
+name: bedrock
+
+networks:
+  net01:
+    driver: bridge
+
+services:
+
+#----------------------------------------------------------------------------------------------
+  #mysql环境# https://github.com/bitnami/containers/tree/main/bitnami/mysql#how-to-use-this-image
+  # todo sudo rm -rf mysql ; sudo mkdir -p mysql/data mysql/conf  && sudo chown -R 1001:1001 mysql &&  sudo docker pull registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/mysql:8.0 && sudo docker tag registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/mysql:8.0 bitnami/mysql:8.0
+  mysql:
+    image: bitnami/mysql:8.0  # sudo docker pull registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/mysql:8.0 && sudo docker tag registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/mysql:8.0 bitnami/mysql:8.0
+    container_name: bedrock-mysql # 强制指定容器的名称为 mysql
+    hostname: mysql # 设置容器内部的主机名为 mysql
+    restart: unless-stopped
+#    privileged: true # 特权模式
+    ports:
+      - "3306:3306"
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: bedrock # 自动创建数据库 bedrock
+#    volumes:
+#      - "./mysql/data:/bitnami/mysql/data" # sudo rm -rf mysql ; sudo mkdir mysql && sudo chown -R 1001:1001 mysql
+#      - "./mysql/conf:/opt/bitnami/mysql/conf"
+    networks:
+      - net01
+    healthcheck:
+      test: [ 'CMD', '/opt/bitnami/scripts/mysql/healthcheck.sh' ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+#----------------------------------------------------------------------------------------------
+  redis:
+    image: "bitnami/redis:latest"
+    container_name: bedrock-redis # 强制指定容器的名称为 mysql
+    hostname: redis # 设置容器内部的主机名为 mysql
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes
+    networks:
+      - net01
+##----------------------------------------------------------------------------------------------
+#  #jaeger链路追踪 — Jaeger for tracing https://github.com/bitnami/containers/tree/main/bitnami/jaeger
+#  # todo sudo rm -rf jaeger ; mkdir jaeger && chown -R 1001:1001 jaeger && sudo docker pull registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/jaeger:1 && sudo docker tag registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/jaeger:1 bitnami/jaeger:1
+#  jaeger:
+#    image: bitnami/jaeger:latest # sudo docker pull registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/jaeger:1 && sudo docker tag registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/jaeger:1 bitnami/jaeger:1
+#    container_name: bedrock-jaeger
+#    hostname: jaeger # 设置容器内部的主机名为 jaeger
+#    restart: unless-stopped
+#    ports:
+#      - 6831:6831 # Jaeger 自己的 Thrift 协议（UDP），通常用于旧版 Jaeger Client。
+#      - 6832:6832
+#      - 5778:5778 # 采样配置管理接口。
+#      - 16686:16686 # Web UI 端口。启动后访问 http://localhost:16686 就能看到追踪界面。
+#      - 4317:4317 # OTLP 协议端口（gRPC / HTTP）
+#      - 4318:4318
+#      - 14250:14250 # 用于 Collector 和 Agent 之间的通信。
+#      - 14268:14268
+#      - 14269:14269
+#      - 9411:9411 # Zipkin 兼容端口
+#    environment:
+#      - LOG_LEVEL=debug
+#      - SPAN_STORAGE_TYPE=memory
+##      - SPAN_STORAGE_TYPE=elasticsearch
+##      - ES_SERVER_URLS=http://elasticsearch:9200
+##    volumes:
+##      - ./jaeger/data:/bitnami/jaeger/data # sudo rm -rf jaeger ; sudo mkdir jaeger && sudo chown -R 1001:1001 jaeger
+##      - ./jaeger/conf:/opt/bitnami/jaeger/conf/config
+##    depends_on:
+##      elasticsearch:
+##        condition: service_healthy
+#    networks:
+#      - net01# ---------------------------------------------------------------------------
+# Jaeger (链路追踪)
+# 使用官方 All-in-One 镜像，替代 bitnami/jaeger
+# ---------------------------------------------------------------------------
+  jaeger:
+    # 官方镜像，集成了 UI、Collector、Query 和 Agent
+    image: jaegertracing/all-in-one:1.55
+    container_name: bedrock-jaeger
+    hostname: jaeger
+    restart: unless-stopped
+    ports:
+      # 1. Web UI 端口 (浏览器访问 http://localhost:16686)
+      - "16686:16686"
+      # 2. OTLP 协议端口 (你的 Go 代码主要用这个)
+      - "4317:4317"   # gRPC
+      - "4318:4318"   # HTTP
+      # 3. 兼容性端口
+      - "9411:9411"   # Zipkin 兼容
+      - "14250:14250" # Model 端口
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411 # 开启 Zipkin 收集器支持 (默认可能开启，显式加上更保险)
+      - LOG_LEVEL=debug
+    networks:
+      - net01
+  # Zipkin 服务
+  zipkin:
+    image: openzipkin/zipkin-slim:2.24
+    container_name: bedrock-zipkin
+    hostname: zipkin
+    restart: unless-stopped
+    ports:
+      - '19411:9411'
+    networks:
+      - net01
