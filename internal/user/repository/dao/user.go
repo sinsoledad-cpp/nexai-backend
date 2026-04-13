@@ -13,13 +13,13 @@ import (
 
 type User struct {
 	ID       int64          `gorm:"primaryKey,autoIncrement"`
-	Email    sql.NullString `gorm:"unique"` //Email    *string // 代表这是一个可以为 NULL 的列
+	Email    sql.NullString `gorm:"uniqueIndex;size:255"` //Email    *string // 代表这是一个可以为 NULL 的列
 	Password string
 	Nickname string         `gorm:"type=varchar(128)"`
 	Birthday sql.NullInt64  // YYYY-MM-DD
 	Avatar   string         `gorm:"type=varchar(1024)"` // 头像
 	AboutMe  string         `gorm:"type=varchar(4096)"`
-	Phone    sql.NullString `gorm:"unique"` // 代表这是一个可以为 NULL 的列
+	Phone    sql.NullString `gorm:"uniqueIndex;size:20"` // 代表这是一个可以为 NULL 的列
 	Ctime    int64          // 创建时间 // 时区，UTC 0 的毫秒数
 	Utime    int64          // 更新时间
 	// json 存储

@@ -27,6 +27,7 @@ type UserService interface {
 	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
 	ResetPasswordByPhone(ctx context.Context, phone string, password string) error
 	ResetPasswordByEmail(ctx context.Context, email string, password string) error
+	ChangePassword(ctx context.Context, uid int64, oldPassword, newPassword string) error
 }
 
 type DefaultUserService struct {
@@ -162,6 +163,27 @@ func (svc *DefaultUserService) ResetPasswordByEmail(ctx context.Context, email s
 	}
 	return svc.repo.UpdateNonZeroFields(ctx, domain.User{
 		ID:       u.ID,
+		Password: string(hash),
+	})
+}
+
+func (svc *DefaultUserService) ChangePassword(ctx context.Context, uid int64, oldPassword, newPassword string) error {
+	user, err := svc.repo.FindById(ctx, uid)
+	if err != nil {
+		return err
+	}
+
+	if !user.VerifyPassword(oldPassword) {
+		return ErrInvalidUserOrPassword
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	return svc.repo.UpdateNonZeroFields(ctx, domain.User{
+		ID:       uid,
 		Password: string(hash),
 	})
 }

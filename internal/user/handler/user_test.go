@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"bytes"
 	"errors"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	codeservice "nexai-backend/internal/code/service"
@@ -9,6 +11,7 @@ import (
 	jwtware "nexai-backend/internal/common/jwt"
 	jwtmocks "nexai-backend/internal/common/jwt/mocks"
 	"nexai-backend/internal/user/domain"
+	"nexai-backend/internal/user/handler/dto"
 	"nexai-backend/internal/user/handler/errs"
 	"nexai-backend/internal/user/service"
 	svcmocks "nexai-backend/internal/user/service/mocks"
@@ -28,7 +31,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 	testCases := []struct {
 		name string
 		mock func(ctrl *gomock.Controller) service.UserService
-		req  SignUpReq
+		req  dto.SignUpRequest
 
 		wantResult ginx.Result
 		wantErr    error
@@ -43,7 +46,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 				}).Return(nil)
 				return svc
 			},
-			req: SignUpReq{
+			req: dto.SignUpRequest{
 				Email:           "test@example.com",
 				Password:        "Password123!",
 				ConfirmPassword: "Password123!",
@@ -60,7 +63,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 				svc := svcmocks.NewMockUserService(ctrl)
 				return svc
 			},
-			req: SignUpReq{
+			req: dto.SignUpRequest{
 				Email:           "test@example.com",
 				Password:        "Password123!",
 				ConfirmPassword: "Password1234!",
@@ -77,7 +80,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 				svc := svcmocks.NewMockUserService(ctrl)
 				return svc
 			},
-			req: SignUpReq{
+			req: dto.SignUpRequest{
 				Email:           "invalid-email",
 				Password:        "Password123!",
 				ConfirmPassword: "Password123!",
@@ -94,7 +97,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 				svc := svcmocks.NewMockUserService(ctrl)
 				return svc
 			},
-			req: SignUpReq{
+			req: dto.SignUpRequest{
 				Email:           "test@example.com",
 				Password:        "123",
 				ConfirmPassword: "123",
@@ -115,7 +118,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 				}).Return(service.ErrDuplicateEmail)
 				return svc
 			},
-			req: SignUpReq{
+			req: dto.SignUpRequest{
 				Email:           "test@example.com",
 				Password:        "Password123!",
 				ConfirmPassword: "Password123!",
@@ -136,7 +139,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 				}).Return(errors.New("service error"))
 				return svc
 			},
-			req: SignUpReq{
+			req: dto.SignUpRequest{
 				Email:           "test@example.com",
 				Password:        "Password123!",
 				ConfirmPassword: "Password123!",
@@ -312,7 +315,7 @@ func TestUserHandler_LoginJWT(t *testing.T) {
 	testCases := []struct {
 		name string
 		mock func(ctrl *gomock.Controller) (service.UserService, jwtware.Handler)
-		req  LoginJWTReq
+		req  dto.LoginRequest
 
 		wantResult ginx.Result
 		wantErr    error
@@ -328,7 +331,7 @@ func TestUserHandler_LoginJWT(t *testing.T) {
 				jwtHdl.EXPECT().SetLoginToken(gomock.Any(), int64(123)).Return(nil)
 				return svc, jwtHdl
 			},
-			req: LoginJWTReq{
+			req: dto.LoginRequest{
 				Email:    "test@example.com",
 				Password: "Password123!",
 			},
@@ -346,7 +349,7 @@ func TestUserHandler_LoginJWT(t *testing.T) {
 				svc.EXPECT().Login(gomock.Any(), "test@example.com", "Password123!").Return(domain.User{}, service.ErrInvalidUserOrPassword)
 				return svc, jwtHdl
 			},
-			req: LoginJWTReq{
+			req: dto.LoginRequest{
 				Email:    "test@example.com",
 				Password: "Password123!",
 			},
@@ -366,7 +369,7 @@ func TestUserHandler_LoginJWT(t *testing.T) {
 				}, errors.New("service error"))
 				return svc, jwtHdl
 			},
-			req: LoginJWTReq{
+			req: dto.LoginRequest{
 				Email:    "test@example.com",
 				Password: "Password123!",
 			},
@@ -404,7 +407,7 @@ func TestUserHandler_Edit(t *testing.T) {
 	testCases := []struct {
 		name string
 		mock func(ctrl *gomock.Controller) service.UserService
-		req  UserEditReq
+		req  dto.EditProfileRequest
 		uc   jwtware.UserClaims
 
 		wantResult ginx.Result
@@ -422,7 +425,7 @@ func TestUserHandler_Edit(t *testing.T) {
 				}).Return(nil)
 				return svc
 			},
-			req: UserEditReq{
+			req: dto.EditProfileRequest{
 				Nickname: "new_name",
 				Birthday: "2000-01-01",
 				AboutMe:  "new about me",
@@ -440,7 +443,7 @@ func TestUserHandler_Edit(t *testing.T) {
 				svc := svcmocks.NewMockUserService(ctrl)
 				return svc
 			},
-			req: UserEditReq{
+			req: dto.EditProfileRequest{
 				Birthday: "invalid-date",
 			},
 			uc: jwtware.UserClaims{Uid: 123},
@@ -481,7 +484,7 @@ func TestUserHandler_SendSMSLoginCode(t *testing.T) {
 	testCases := []struct {
 		name string
 		mock func(ctrl *gomock.Controller) codeservice.CodeService
-		req  SendSMSCodeReq
+		req  dto.SendSMSCodeRequest
 
 		wantResult ginx.Result
 		wantErr    error
@@ -493,7 +496,7 @@ func TestUserHandler_SendSMSLoginCode(t *testing.T) {
 				svc.EXPECT().Send(gomock.Any(), "login", "12345678901").Return(nil)
 				return svc
 			},
-			req: SendSMSCodeReq{
+			req: dto.SendSMSCodeRequest{
 				Phone: "12345678901",
 			},
 			wantResult: ginx.Result{
@@ -508,7 +511,7 @@ func TestUserHandler_SendSMSLoginCode(t *testing.T) {
 				svc := codemocks.NewMockCodeService(ctrl)
 				return svc
 			},
-			req: SendSMSCodeReq{
+			req: dto.SendSMSCodeRequest{
 				Phone: "",
 			},
 			wantResult: ginx.Result{
@@ -545,7 +548,7 @@ func TestUserHandler_LoginSMS(t *testing.T) {
 	testCases := []struct {
 		name string
 		mock func(ctrl *gomock.Controller) (codeservice.CodeService, service.UserService, jwtware.Handler)
-		req  LoginSMSReq
+		req  dto.SMSLoginRequest
 
 		wantResult ginx.Result
 		wantErr    error
@@ -563,7 +566,7 @@ func TestUserHandler_LoginSMS(t *testing.T) {
 
 				return codeSvc, userSvc, jwtHdl
 			},
-			req: LoginSMSReq{
+			req: dto.SMSLoginRequest{
 				Phone: "12345678901",
 				Code:  "123456",
 			},
@@ -584,7 +587,7 @@ func TestUserHandler_LoginSMS(t *testing.T) {
 
 				return codeSvc, userSvc, jwtHdl
 			},
-			req: LoginSMSReq{
+			req: dto.SMSLoginRequest{
 				Phone: "12345678901",
 				Code:  "123456",
 			},
@@ -644,7 +647,7 @@ func TestUserHandler_Profile(t *testing.T) {
 			wantResult: ginx.Result{
 				Code: http.StatusOK,
 				Msg:  "获取用户信息成功",
-				Data: ProfileVO{
+				Data: dto.ProfileResponse{
 					Nickname: "test_user",
 					Email:    "test@example.com",
 					AboutMe:  "I am a tester",
@@ -684,6 +687,409 @@ func TestUserHandler_Profile(t *testing.T) {
 			ctx.Request = httptest.NewRequest("GET", "/users/profile", nil)
 
 			res, err := h.Profile(ctx, tc.uc)
+
+			assert.Equal(t, tc.wantErr, err)
+			assert.Equal(t, tc.wantResult, res)
+		})
+	}
+}
+
+func TestUserHandler_ChangePassword(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name       string
+		mock       func(ctrl *gomock.Controller) service.UserService
+		req        dto.ChangePasswordRequest
+		uc         jwtware.UserClaims
+		wantResult ginx.Result
+		wantErr    error
+	}{
+		{
+			name: "修改密码成功",
+			mock: func(ctrl *gomock.Controller) service.UserService {
+				svc := svcmocks.NewMockUserService(ctrl)
+				svc.EXPECT().ChangePassword(gomock.Any(), int64(123), "OldPassword123!", "NewPassword123!").Return(nil)
+				return svc
+			},
+			req: dto.ChangePasswordRequest{
+				OldPassword:     "OldPassword123!",
+				NewPassword:     "NewPassword123!",
+				ConfirmPassword: "NewPassword123!",
+			},
+			uc: jwtware.UserClaims{Uid: 123},
+			wantResult: ginx.Result{
+				Code: http.StatusOK,
+				Msg:  "修改密码成功",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "旧密码错误",
+			mock: func(ctrl *gomock.Controller) service.UserService {
+				svc := svcmocks.NewMockUserService(ctrl)
+				svc.EXPECT().ChangePassword(gomock.Any(), int64(123), "OldPassword123!", "NewPassword123!").Return(service.ErrInvalidUserOrPassword)
+				return svc
+			},
+			req: dto.ChangePasswordRequest{
+				OldPassword:     "OldPassword123!",
+				NewPassword:     "NewPassword123!",
+				ConfirmPassword: "NewPassword123!",
+			},
+			uc: jwtware.UserClaims{Uid: 123},
+			wantResult: ginx.Result{
+				Code: errs.UserInvalidOrPassword,
+				Msg:  "旧密码错误",
+			},
+			wantErr: service.ErrInvalidUserOrPassword,
+		},
+		{
+			name: "两次输入密码不一致",
+			mock: func(ctrl *gomock.Controller) service.UserService {
+				svc := svcmocks.NewMockUserService(ctrl)
+				return svc
+			},
+			req: dto.ChangePasswordRequest{
+				OldPassword:     "OldPassword123!",
+				NewPassword:     "NewPassword123!",
+				ConfirmPassword: "NewPassword1234!",
+			},
+			uc: jwtware.UserClaims{Uid: 123},
+			wantResult: ginx.Result{
+				Code: errs.UserInvalidInput,
+				Msg:  "两次输入密码不同",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "新密码格式错误",
+			mock: func(ctrl *gomock.Controller) service.UserService {
+				svc := svcmocks.NewMockUserService(ctrl)
+				return svc
+			},
+			req: dto.ChangePasswordRequest{
+				OldPassword:     "OldPassword123!",
+				NewPassword:     "123",
+				ConfirmPassword: "123",
+			},
+			uc: jwtware.UserClaims{Uid: 123},
+			wantResult: ginx.Result{
+				Code: errs.UserInvalidInput,
+				Msg:  "密码必须包含数字、特殊字符、大小字母，并且长度不能小于 8 位",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "系统错误",
+			mock: func(ctrl *gomock.Controller) service.UserService {
+				svc := svcmocks.NewMockUserService(ctrl)
+				svc.EXPECT().ChangePassword(gomock.Any(), int64(123), "OldPassword123!", "NewPassword123!").Return(errors.New("service error"))
+				return svc
+			},
+			req: dto.ChangePasswordRequest{
+				OldPassword:     "OldPassword123!",
+				NewPassword:     "NewPassword123!",
+				ConfirmPassword: "NewPassword123!",
+			},
+			uc: jwtware.UserClaims{Uid: 123},
+			wantResult: ginx.Result{
+				Code: errs.UserInternalServerError,
+				Msg:  "系统错误",
+			},
+			wantErr: errors.New("service error"),
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			svc := tc.mock(ctrl)
+			h := NewUserHandler(logger.NewNopLogger(), svc, nil, nil)
+
+			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+			ctx.Request = httptest.NewRequest("POST", "/users/change_password", nil)
+
+			res, err := h.ChangePassword(ctx, tc.req, tc.uc)
+
+			assert.Equal(t, tc.wantErr, err)
+			assert.Equal(t, tc.wantResult, res)
+		})
+	}
+}
+
+func TestUserHandler_SendSMSResetPasswordCode(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name string
+		mock func(ctrl *gomock.Controller) codeservice.CodeService
+		req  dto.SendSMSResetPasswordCodeRequest
+
+		wantResult ginx.Result
+		wantErr    error
+	}{
+		{
+			name: "发送成功",
+			mock: func(ctrl *gomock.Controller) codeservice.CodeService {
+				svc := codemocks.NewMockCodeService(ctrl)
+				svc.EXPECT().Send(gomock.Any(), "reset-password", "12345678901").Return(nil)
+				return svc
+			},
+			req: dto.SendSMSResetPasswordCodeRequest{
+				Phone: "12345678901",
+			},
+			wantResult: ginx.Result{
+				Code: http.StatusOK,
+				Msg:  "发送成功",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "未输入手机号码或邮箱",
+			mock: func(ctrl *gomock.Controller) codeservice.CodeService {
+				svc := codemocks.NewMockCodeService(ctrl)
+				return svc
+			},
+			req: dto.SendSMSResetPasswordCodeRequest{
+				Phone: "",
+				Email: "",
+			},
+			wantResult: ginx.Result{
+				Code: errs.UserInvalidInput,
+				Msg:  "请输入手机号码或邮箱",
+			},
+			wantErr: nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			svc := tc.mock(ctrl)
+			h := NewUserHandler(logger.NewNopLogger(), nil, svc, nil)
+
+			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+			ctx.Request = httptest.NewRequest("POST", "/users/reset_password/code/send", nil)
+
+			res, err := h.SendSMSResetPasswordCode(ctx, tc.req)
+
+			assert.Equal(t, tc.wantErr, err)
+			assert.Equal(t, tc.wantResult, res)
+		})
+	}
+}
+
+func TestUserHandler_ResetPassword(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name string
+		mock func(ctrl *gomock.Controller) (codeservice.CodeService, service.UserService)
+		req  dto.ResetPasswordRequest
+
+		wantResult ginx.Result
+		wantErr    error
+	}{
+		{
+			name: "重置密码成功",
+			mock: func(ctrl *gomock.Controller) (codeservice.CodeService, service.UserService) {
+				codeSvc := codemocks.NewMockCodeService(ctrl)
+				userSvc := svcmocks.NewMockUserService(ctrl)
+
+				codeSvc.EXPECT().Verify(gomock.Any(), "reset-password", "test@example.com", "123456").Return(true, nil)
+				userSvc.EXPECT().ResetPasswordByEmail(gomock.Any(), "test@example.com", "NewPassword123!").Return(nil)
+
+				return codeSvc, userSvc
+			},
+			req: dto.ResetPasswordRequest{
+				Phone:           "12345678901",
+				Code:            "123456",
+				Password:        "NewPassword123!",
+				ConfirmPassword: "NewPassword123!",
+				Email:           "test@example.com",
+			},
+			wantResult: ginx.Result{
+				Code: http.StatusOK,
+				Msg:  "重置密码成功",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "验证码错误",
+			mock: func(ctrl *gomock.Controller) (codeservice.CodeService, service.UserService) {
+				codeSvc := codemocks.NewMockCodeService(ctrl)
+				userSvc := svcmocks.NewMockUserService(ctrl)
+
+				codeSvc.EXPECT().Verify(gomock.Any(), "reset-password", "test@example.com", "123456").Return(false, nil)
+
+				return codeSvc, userSvc
+			},
+			req: dto.ResetPasswordRequest{
+				Phone:           "12345678901",
+				Code:            "123456",
+				Password:        "NewPassword123!",
+				ConfirmPassword: "NewPassword123!",
+				Email:           "test@example.com",
+			},
+			wantResult: ginx.Result{
+				Code: errs.UserCodeInvalid,
+				Msg:  "验证码不对，请重新输入",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "两次输入密码不一致",
+			mock: func(ctrl *gomock.Controller) (codeservice.CodeService, service.UserService) {
+				codeSvc := codemocks.NewMockCodeService(ctrl)
+				userSvc := svcmocks.NewMockUserService(ctrl)
+				return codeSvc, userSvc
+			},
+			req: dto.ResetPasswordRequest{
+				Phone:           "12345678901",
+				Code:            "123456",
+				Password:        "NewPassword123!",
+				ConfirmPassword: "NewPassword1234!",
+				Email:           "test@example.com",
+			},
+			wantResult: ginx.Result{
+				Code: errs.UserInvalidInput,
+				Msg:  "两次输入密码不同",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "新密码格式错误",
+			mock: func(ctrl *gomock.Controller) (codeservice.CodeService, service.UserService) {
+				codeSvc := codemocks.NewMockCodeService(ctrl)
+				userSvc := svcmocks.NewMockUserService(ctrl)
+				return codeSvc, userSvc
+			},
+			req: dto.ResetPasswordRequest{
+				Phone:           "12345678901",
+				Code:            "123456",
+				Password:        "123",
+				ConfirmPassword: "123",
+				Email:           "test@example.com",
+			},
+			wantResult: ginx.Result{
+				Code: errs.UserInvalidInput,
+				Msg:  "密码必须包含数字、特殊字符、大小字母，并且长度不能小于 8 位",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "系统错误",
+			mock: func(ctrl *gomock.Controller) (codeservice.CodeService, service.UserService) {
+				codeSvc := codemocks.NewMockCodeService(ctrl)
+				userSvc := svcmocks.NewMockUserService(ctrl)
+
+				codeSvc.EXPECT().Verify(gomock.Any(), "reset-password", "test@example.com", "123456").Return(true, nil)
+				userSvc.EXPECT().ResetPasswordByEmail(gomock.Any(), "test@example.com", "NewPassword123!").Return(errors.New("service error"))
+
+				return codeSvc, userSvc
+			},
+			req: dto.ResetPasswordRequest{
+				Phone:           "12345678901",
+				Code:            "123456",
+				Password:        "NewPassword123!",
+				ConfirmPassword: "NewPassword123!",
+				Email:           "test@example.com",
+			},
+			wantResult: ginx.Result{
+				Code: errs.UserInternalServerError,
+				Msg:  "系统错误",
+			},
+			wantErr: errors.New("service error"),
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			codeSvc, userSvc := tc.mock(ctrl)
+			h := NewUserHandler(logger.NewNopLogger(), userSvc, codeSvc, nil)
+
+			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+			ctx.Request = httptest.NewRequest("POST", "/users/reset_password", nil)
+
+			res, err := h.ResetPassword(ctx, tc.req)
+
+			assert.Equal(t, tc.wantErr, err)
+			assert.Equal(t, tc.wantResult, res)
+		})
+	}
+}
+
+func TestUserHandler_UploadAvatar(t *testing.T) {
+	t.Parallel()
+	testCases := []struct {
+		name       string
+		mock       func(ctrl *gomock.Controller) service.UserService
+		uc         jwtware.UserClaims
+		wantResult ginx.Result
+		wantErr    error
+	}{
+		{
+			name: "头像上传成功",
+			mock: func(ctrl *gomock.Controller) service.UserService {
+				svc := svcmocks.NewMockUserService(ctrl)
+				svc.EXPECT().UpdateAvatarPath(gomock.Any(), gomock.Eq(int64(123)), gomock.Any()).Return(nil)
+				return svc
+			},
+			uc: jwtware.UserClaims{Uid: 123},
+			wantResult: ginx.Result{
+				Code: http.StatusOK,
+				Msg:  "头像上传成功",
+			},
+			wantErr: nil,
+		},
+		{
+			name: "头像上传失败_服务错误",
+			mock: func(ctrl *gomock.Controller) service.UserService {
+				svc := svcmocks.NewMockUserService(ctrl)
+				svc.EXPECT().UpdateAvatarPath(gomock.Any(), gomock.Eq(int64(123)), gomock.Any()).Return(errors.New("service error"))
+				return svc
+			},
+			uc: jwtware.UserClaims{Uid: 123},
+			wantResult: ginx.Result{
+				Code: errs.UserInternalServerError,
+				Msg:  "头像上传失败",
+			},
+			wantErr: errors.New("service error"),
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			svc := tc.mock(ctrl)
+			h := NewUserHandler(logger.NewNopLogger(), svc, nil, nil)
+
+			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+			// Create a multipart form with a dummy file
+			body := new(bytes.Buffer)
+			writer := multipart.NewWriter(body)
+			part, _ := writer.CreateFormFile("avatar", "test_avatar.jpg")
+			_, _ = part.Write([]byte("dummy image content"))
+			writer.Close()
+
+			ctx.Request = httptest.NewRequest("POST", "/users/avatar/upload", body)
+			ctx.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+			res, err := h.UploadAvatar(ctx, tc.uc)
 
 			assert.Equal(t, tc.wantErr, err)
 			assert.Equal(t, tc.wantResult, res)

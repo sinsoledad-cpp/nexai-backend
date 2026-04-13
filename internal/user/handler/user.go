@@ -2,11 +2,13 @@ package handler
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	codeservice "nexai-backend/internal/code/service"
 	jwtware "nexai-backend/internal/common/jwt"
 	"nexai-backend/internal/common/router"
 	"nexai-backend/internal/user/domain"
+	"nexai-backend/internal/user/handler/dto"
 	"nexai-backend/internal/user/handler/errs"
 	userservice "nexai-backend/internal/user/service"
 	"nexai-backend/pkg/ginx"
@@ -24,7 +26,7 @@ const (
 	emailRegexPattern    = "(?i)^[A-Z0-9_!#$%&'*+/=?`{|}~^.-]+@[A-Z0-9.-]+$"
 	passwordRegexPattern = `^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]).{8,}$`
 	bizLogin             = "login"
-	bizResetPassword     = "password_reset"
+	bizResetPassword     = "reset-password"
 )
 
 type UserHandler struct {
@@ -48,30 +50,34 @@ func NewUserHandler(log logger.Logger, userSvc userservice.UserService, codeSvc 
 }
 
 func (u *UserHandler) RegisterRoutes(e *gin.Engine) {
-	g := e.Group("/users")
+	// API 版本控制
+	v1 := e.Group("/v1")
 
-	g.POST("/signup", ginx.WrapBody(u.SignUp))
-	g.POST("/login", ginx.WrapBody(u.LoginJWT))
-	g.POST("/logout", ginx.Wrap(u.LogoutJWT))
-	g.POST("/refresh_token", ginx.Wrap(u.RefreshToken))
+	// 用户相关路由
+	users := v1.Group("/users")
 
-	g.POST("/avatar/upload", ginx.WrapClaims(u.UploadAvatar))
-	g.POST("/edit", ginx.WrapBodyAndClaims(u.Edit))
-	g.GET("/profile", ginx.WrapClaims(u.Profile))
+	// 认证相关
+	users.POST("/signup", ginx.WrapBody(u.SignUp))
+	users.POST("/login", ginx.WrapBody(u.LoginJWT))
+	users.DELETE("/token", ginx.Wrap(u.LogoutJWT))
+	users.PUT("/token", ginx.Wrap(u.RefreshToken))
 
-	g.POST("/login_sms/code/send", ginx.WrapBody(u.SendSMSLoginCode))
-	g.POST("/login_sms", ginx.WrapBody(u.LoginSMS))
-	g.POST("/password_reset/code/send", ginx.WrapBody(u.SendSMSResetPasswordCode))
-	g.POST("/password_reset", ginx.WrapBody(u.ResetPassword))
+	// 用户信息相关
+	users.POST("/avatar", ginx.WrapClaims(u.UploadAvatar))
+	users.PUT("/profile", ginx.WrapBodyAndClaims(u.Edit))
+	users.GET("/profile", ginx.WrapClaims(u.Profile))
+
+	// 短信验证码相关
+	users.POST("/verification-codes/login", ginx.WrapBody(u.SendSMSLoginCode))
+	users.POST("/login/sms", ginx.WrapBody(u.LoginSMS))
+	users.POST("/verification-codes/reset-password", ginx.WrapBody(u.SendSMSResetPasswordCode))
+
+	// 密码相关
+	users.POST("/password/reset", ginx.WrapBody(u.ResetPassword))
+	users.PUT("/password", ginx.WrapBodyAndClaims(u.ChangePassword))
 }
 
-type SignUpReq struct {
-	Email           string `json:"email" binding:"required,email"`
-	Password        string `json:"password" binding:"required"`
-	ConfirmPassword string `json:"confirmPassword" binding:"required"`
-}
-
-func (u *UserHandler) SignUp(ctx *gin.Context, req SignUpReq) (ginx.Result, error) {
+func (u *UserHandler) SignUp(ctx *gin.Context, req dto.SignUpRequest) (ginx.Result, error) {
 	// 校验客户端输入
 	isEmail, err := u.emailRegexExp.MatchString(req.Email)
 	if err != nil {
@@ -129,12 +135,7 @@ func (u *UserHandler) SignUp(ctx *gin.Context, req SignUpReq) (ginx.Result, erro
 	}, nil
 }
 
-type LoginJWTReq struct {
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required"`
-}
-
-func (u *UserHandler) LoginJWT(ctx *gin.Context, req LoginJWTReq) (ginx.Result, error) {
+func (u *UserHandler) LoginJWT(ctx *gin.Context, req dto.LoginRequest) (ginx.Result, error) {
 	user, err := u.userSvc.Login(ctx, req.Email, req.Password)
 	switch {
 	case err == nil:
@@ -227,19 +228,41 @@ func (u *UserHandler) RefreshToken(ctx *gin.Context) (ginx.Result, error) {
 }
 
 func (u *UserHandler) UploadAvatar(ctx *gin.Context, uc jwtware.UserClaims) (ginx.Result, error) {
-	// 暂时禁用头像上传功能，因为存储服务未实现
-	return ginx.Result{
-		Code: http.StatusNotImplemented,
-		Msg:  "头像上传功能暂未实现",
-	}, nil
-}
+	file, err := ctx.FormFile("avatar")
+	if err != nil {
+		return ginx.Result{
+			Code: errs.UserInvalidInput,
+			Msg:  "无法获取头像文件",
+		}, err
+	}
 
-type ProfileVO struct {
-	Nickname string `json:"nickname"`
-	Email    string `json:"email"`
-	AboutMe  string `json:"aboutMe"`
-	Birthday string `json:"birthday"`
-	Avatar   string `json:"avatar"`
+	// 假设头像存储在本地的 uploads/avatars 目录下
+	// 实际项目中应该使用对象存储服务，如 AWS S3, Aliyun OSS 等
+	// 为了简化，这里仅模拟存储
+	avatarPath := fmt.Sprintf("uploads/avatars/%d_%s", uc.Uid, file.Filename)
+	err = ctx.SaveUploadedFile(file, avatarPath)
+	if err != nil {
+		u.log.Error("保存头像文件失败", logger.Error(err))
+		return ginx.Result{
+			Code: errs.UserInternalServerError,
+			Msg:  "头像上传失败",
+		}, err
+	}
+
+	err = u.userSvc.UpdateAvatarPath(ctx, uc.Uid, avatarPath)
+	if err != nil {
+		// 如果服务层更新失败，理论上需要删除已经上传的文件
+		u.log.Error("更新用户头像路径失败", logger.Error(err))
+		return ginx.Result{
+			Code: errs.UserInternalServerError,
+			Msg:  "头像上传失败",
+		}, err
+	}
+
+	return ginx.Result{
+		Code: http.StatusOK,
+		Msg:  "头像上传成功",
+	}, nil
 }
 
 func (u *UserHandler) Profile(ctx *gin.Context, uc jwtware.UserClaims) (ginx.Result, error) {
@@ -253,7 +276,7 @@ func (u *UserHandler) Profile(ctx *gin.Context, uc jwtware.UserClaims) (ginx.Res
 	return ginx.Result{
 		Code: http.StatusOK,
 		Msg:  "获取用户信息成功",
-		Data: ProfileVO{
+		Data: dto.ProfileResponse{
 			Nickname: user.Nickname,
 			Email:    user.Email,
 			AboutMe:  user.AboutMe,
@@ -263,15 +286,7 @@ func (u *UserHandler) Profile(ctx *gin.Context, uc jwtware.UserClaims) (ginx.Res
 	}, nil
 }
 
-type UserEditReq struct {
-	// 改邮箱，密码，或者能不能改手机号
-	Nickname string `json:"nickname"`
-	// YYYY-MM-DD
-	Birthday string `json:"birthday"`
-	AboutMe  string `json:"aboutMe"`
-}
-
-func (u *UserHandler) Edit(ctx *gin.Context, req UserEditReq, uc jwtware.UserClaims) (ginx.Result, error) {
+func (u *UserHandler) Edit(ctx *gin.Context, req dto.EditProfileRequest, uc jwtware.UserClaims) (ginx.Result, error) {
 	// 嵌入一段刷新过期时间的代码
 	//sess := sessions.Default(ctx)
 	//sess.Get("uid")
@@ -301,11 +316,7 @@ func (u *UserHandler) Edit(ctx *gin.Context, req UserEditReq, uc jwtware.UserCla
 	}, nil
 }
 
-type SendSMSCodeReq struct {
-	Phone string `json:"phone" binding:"required,len=11,numeric"`
-}
-
-func (u *UserHandler) SendSMSLoginCode(ctx *gin.Context, req SendSMSCodeReq) (ginx.Result, error) {
+func (u *UserHandler) SendSMSLoginCode(ctx *gin.Context, req dto.SendSMSCodeRequest) (ginx.Result, error) {
 	// 你这边可以校验 Req
 	if req.Phone == "" {
 		return ginx.Result{
@@ -336,12 +347,7 @@ func (u *UserHandler) SendSMSLoginCode(ctx *gin.Context, req SendSMSCodeReq) (gi
 	}
 }
 
-type LoginSMSReq struct {
-	Phone string `json:"phone" binding:"required,len=11,numeric"`
-	Code  string `json:"code" binding:"required,len=6,numeric"`
-}
-
-func (u *UserHandler) LoginSMS(ctx *gin.Context, req LoginSMSReq) (ginx.Result, error) {
+func (u *UserHandler) LoginSMS(ctx *gin.Context, req dto.SMSLoginRequest) (ginx.Result, error) {
 	ok, err := u.codeSvc.Verify(ctx, bizLogin, req.Phone, req.Code)
 	if err != nil {
 		switch {
@@ -388,12 +394,7 @@ func (u *UserHandler) LoginSMS(ctx *gin.Context, req LoginSMSReq) (ginx.Result, 
 	}, nil
 }
 
-type SendSMSResetPasswordCodeReq struct {
-	Phone string `json:"phone"`
-	Email string `json:"email"`
-}
-
-func (u *UserHandler) SendSMSResetPasswordCode(ctx *gin.Context, req SendSMSResetPasswordCodeReq) (ginx.Result, error) {
+func (u *UserHandler) SendSMSResetPasswordCode(ctx *gin.Context, req dto.SendSMSResetPasswordCodeRequest) (ginx.Result, error) {
 	if req.Phone == "" && req.Email == "" {
 		return ginx.Result{
 			Code: errs.UserInvalidInput,
@@ -424,15 +425,7 @@ func (u *UserHandler) SendSMSResetPasswordCode(ctx *gin.Context, req SendSMSRese
 	}
 }
 
-type ResetPasswordReq struct {
-	Phone           string `json:"phone"`
-	Email           string `json:"email"`
-	Code            string `json:"code" binding:"required"`
-	Password        string `json:"password" binding:"required"`
-	ConfirmPassword string `json:"confirmPassword" binding:"required"`
-}
-
-func (u *UserHandler) ResetPassword(ctx *gin.Context, req ResetPasswordReq) (ginx.Result, error) {
+func (u *UserHandler) ResetPassword(ctx *gin.Context, req dto.ResetPasswordRequest) (ginx.Result, error) {
 	if req.Phone == "" && req.Email == "" {
 		return ginx.Result{
 			Code: errs.UserInvalidInput,
@@ -504,5 +497,47 @@ func (u *UserHandler) ResetPassword(ctx *gin.Context, req ResetPasswordReq) (gin
 	return ginx.Result{
 		Code: http.StatusOK,
 		Msg:  "重置密码成功",
+	}, nil
+}
+
+func (u *UserHandler) ChangePassword(ctx *gin.Context, req dto.ChangePasswordRequest, uc jwtware.UserClaims) (ginx.Result, error) {
+	if req.NewPassword != req.ConfirmPassword {
+		return ginx.Result{
+			Code: errs.UserInvalidInput,
+			Msg:  "两次输入密码不同",
+		}, nil
+	}
+
+	isPassword, err := u.passwordRegexExp.MatchString(req.NewPassword)
+	if err != nil {
+		return ginx.Result{
+			Code: errs.UserInternalServerError,
+			Msg:  "系统错误",
+		}, err
+	}
+	if !isPassword {
+		return ginx.Result{
+			Code: errs.UserInvalidInput,
+			Msg:  "密码必须包含数字、特殊字符、大小字母，并且长度不能小于 8 位",
+		}, nil
+	}
+
+	err = u.userSvc.ChangePassword(ctx, uc.Uid, req.OldPassword, req.NewPassword)
+	if err != nil {
+		if errors.Is(err, userservice.ErrInvalidUserOrPassword) {
+			return ginx.Result{
+				Code: errs.UserInvalidOrPassword,
+				Msg:  "旧密码错误",
+			}, err
+		}
+		return ginx.Result{
+			Code: errs.UserInternalServerError,
+			Msg:  "系统错误",
+		}, err
+	}
+
+	return ginx.Result{
+		Code: http.StatusOK,
+		Msg:  "修改密码成功",
 	}, nil
 }

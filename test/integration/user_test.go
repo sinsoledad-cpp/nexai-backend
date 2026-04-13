@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"nexai-backend/internal/user/handler"
+	"nexai-backend/internal/user/handler/dto"
 	"nexai-backend/internal/user/handler/errs"
 	"nexai-backend/internal/user/repository/dao"
 	"nexai-backend/test/integration/startup"
@@ -61,7 +61,7 @@ func (s *UserTestSuite) TestSignUp() {
 		name     string
 		before   func(t *testing.T)
 		after    func(t *testing.T)
-		req      handler.SignUpReq
+		req      dto.SignUpRequest
 		wantCode int
 		wantMsg  string
 	}{
@@ -80,7 +80,7 @@ func (s *UserTestSuite) TestSignUp() {
 				// 清理数据
 				s.db.Where("email = ?", "test_signup_success@example.com").Delete(&dao.User{})
 			},
-			req: handler.SignUpReq{
+			req: dto.SignUpRequest{
 				Email:           "test_signup_success@example.com",
 				Password:        "Password123!",
 				ConfirmPassword: "Password123!",
@@ -90,7 +90,7 @@ func (s *UserTestSuite) TestSignUp() {
 		},
 		{
 			name: "邮箱格式错误",
-			req: handler.SignUpReq{
+			req: dto.SignUpRequest{
 				Email:           "invalid-email",
 				Password:        "Password123!",
 				ConfirmPassword: "Password123!",
@@ -100,7 +100,7 @@ func (s *UserTestSuite) TestSignUp() {
 		},
 		{
 			name: "两次密码不一致",
-			req: handler.SignUpReq{
+			req: dto.SignUpRequest{
 				Email:           "test2@example.com",
 				Password:        "Password123!",
 				ConfirmPassword: "Password1234!",
@@ -125,7 +125,7 @@ func (s *UserTestSuite) TestSignUp() {
 				// 清理数据
 				s.db.Where("email = ?", "duplicate@example.com").Delete(&dao.User{})
 			},
-			req: handler.SignUpReq{
+			req: dto.SignUpRequest{
 				Email:           "duplicate@example.com",
 				Password:        "Password123!",
 				ConfirmPassword: "Password123!",
@@ -179,7 +179,7 @@ func (s *UserTestSuite) TestLogin() {
 		name     string
 		before   func(t *testing.T)
 		after    func(t *testing.T)
-		req      handler.LoginJWTReq
+		req      dto.LoginRequest
 		wantCode int
 		wantMsg  string
 	}{
@@ -203,7 +203,7 @@ func (s *UserTestSuite) TestLogin() {
 			after: func(t *testing.T) {
 				s.db.Where("email = ?", "test_login_success@example.com").Delete(&dao.User{})
 			},
-			req: handler.LoginJWTReq{
+			req: dto.LoginRequest{
 				Email:    "test_login_success@example.com",
 				Password: "Password123!",
 			},
@@ -216,7 +216,7 @@ func (s *UserTestSuite) TestLogin() {
 			},
 			after: func(t *testing.T) {
 			},
-			req: handler.LoginJWTReq{
+			req: dto.LoginRequest{
 				Email:    "test_login_not_found@example.com",
 				Password: "Password123!",
 			},
@@ -241,7 +241,7 @@ func (s *UserTestSuite) TestLogin() {
 			after: func(t *testing.T) {
 				s.db.Where("email = ?", "test_login_wrong_password@example.com").Delete(&dao.User{})
 			},
-			req: handler.LoginJWTReq{
+			req: dto.LoginRequest{
 				Email:    "test_login_wrong_password@example.com",
 				Password: "WrongPassword!",
 			},
@@ -295,7 +295,7 @@ func (s *UserTestSuite) TestEdit() {
 		name     string
 		before   func(t *testing.T) (string, int64) // 返回 token 和 uid
 		after    func(t *testing.T, uid int64)
-		req      handler.UserEditReq
+		req      dto.EditProfileRequest
 		wantCode int
 		wantMsg  string
 	}{
@@ -323,7 +323,7 @@ func (s *UserTestSuite) TestEdit() {
 				// 清理数据
 				s.db.Where("email = ?", "test_edit_success@example.com").Delete(&dao.User{})
 			},
-			req: handler.UserEditReq{
+			req: dto.EditProfileRequest{
 				Nickname: "new_nickname",
 				AboutMe:  "new_about_me",
 				Birthday: "2000-01-01",
@@ -388,7 +388,7 @@ func (s *UserTestSuite) TestProfile() {
 		after    func(t *testing.T, uid int64)
 		wantCode int
 		wantMsg  string
-		wantData handler.ProfileVO
+		wantData dto.ProfileResponse
 	}{
 		{
 			name: "获取成功",
@@ -407,7 +407,7 @@ func (s *UserTestSuite) TestProfile() {
 			},
 			wantCode: 200,
 			wantMsg:  "获取用户信息成功",
-			wantData: handler.ProfileVO{
+			wantData: dto.ProfileResponse{
 				Email:    "test_profile_success@example.com",
 				Nickname: "test_nick",
 				AboutMe:  "test_about",
@@ -442,9 +442,9 @@ func (s *UserTestSuite) TestProfile() {
 
 			assert.Equal(t, http.StatusOK, w.Code)
 			var res struct {
-				Code int               `json:"code"`
-				Msg  string            `json:"msg"`
-				Data handler.ProfileVO `json:"data"`
+				Code int                 `json:"code"`
+				Msg  string              `json:"msg"`
+				Data dto.ProfileResponse `json:"data"`
 			}
 			err = json.Unmarshal(w.Body.Bytes(), &res)
 			if err != nil {

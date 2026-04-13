@@ -17,12 +17,12 @@ import (
 func main() {
 	bootstrap.InitViper()
 	bootstrap.InitValidate()
-	tpCancel := bootstrap.InitOTEL()
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		tpCancel(ctx)
-	}()
+	//tpCancel := bootstrap.InitOTEL()
+	//defer func() {
+	//	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	//	defer cancel()
+	//	tpCancel(ctx)
+	//}()
 
 	app := InitApp()
 

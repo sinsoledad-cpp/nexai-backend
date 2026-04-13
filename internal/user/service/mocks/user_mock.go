@@ -41,6 +41,20 @@ func (m *MockUserService) EXPECT() *MockUserServiceMockRecorder {
 	return m.recorder
 }
 
+// ChangePassword mocks base method.
+func (m *MockUserService) ChangePassword(ctx context.Context, uid int64, oldPassword, newPassword string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ChangePassword", ctx, uid, oldPassword, newPassword)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ChangePassword indicates an expected call of ChangePassword.
+func (mr *MockUserServiceMockRecorder) ChangePassword(ctx, uid, oldPassword, newPassword any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ChangePassword", reflect.TypeOf((*MockUserService)(nil).ChangePassword), ctx, uid, oldPassword, newPassword)
+}
+
 // FindById mocks base method.
 func (m *MockUserService) FindById(ctx context.Context, uid int64) (domain.User, error) {
 	m.ctrl.T.Helper()
