@@ -71,7 +71,9 @@ func WrapBodyAndClaims[Req any, Claims jwt.Claims](bizFn func(ctx *gin.Context, 
 		}
 		log.Debug("返回响应", logger.Field{Key: "res:=", Val: res})
 
-		vector.WithLabelValues(strconv.Itoa(res.Code)).Inc()
+		if vector != nil {
+			vector.WithLabelValues(strconv.Itoa(res.Code)).Inc()
+		}
 		ctx.JSON(http.StatusOK, res)
 	}
 }
@@ -84,7 +86,9 @@ func Wrap(bizFn func(ctx *gin.Context) (Result, error)) gin.HandlerFunc {
 		}
 		log.Debug("返回响应", logger.Field{Key: "res:=", Val: res})
 
-		vector.WithLabelValues(strconv.Itoa(res.Code)).Inc()
+		if vector != nil {
+			vector.WithLabelValues(strconv.Itoa(res.Code)).Inc()
+		}
 		ctx.JSON(http.StatusOK, res)
 	}
 }
@@ -120,7 +124,9 @@ func WrapBody[Req any](bizFn func(ctx *gin.Context, req Req) (Result, error)) gi
 		}
 		log.Debug("返回响应", logger.Field{Key: "res:=", Val: res})
 
-		vector.WithLabelValues(strconv.Itoa(res.Code)).Inc()
+		if vector != nil {
+			vector.WithLabelValues(strconv.Itoa(res.Code)).Inc()
+		}
 		ctx.JSON(http.StatusOK, res)
 	}
 }
@@ -146,7 +152,9 @@ func WrapClaims[Claims any](bizFn func(ctx *gin.Context, uc Claims) (Result, err
 		}
 		log.Debug("返回响应", logger.Field{Key: "res:=", Val: res})
 
-		vector.WithLabelValues(strconv.Itoa(res.Code)).Inc()
+		if vector != nil {
+			vector.WithLabelValues(strconv.Itoa(res.Code)).Inc()
+		}
 		ctx.JSON(http.StatusOK, res)
 	}
 }

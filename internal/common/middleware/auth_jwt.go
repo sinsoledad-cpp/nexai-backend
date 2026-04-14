@@ -17,14 +17,14 @@ type JWTAuth struct {
 
 func NewJWTAuth(hdl jwtware.Handler) *JWTAuth {
 	s := set.NewMapSet[string](6)
-	s.Add("/users/signup")
-	s.Add("/users/login_sms/code/send")
-	s.Add("/users/login_sms")
-	s.Add("/users/refresh_token")
-	s.Add("/users/login")
-	s.Add("/oauth2/wechat/authurl")
-	s.Add("/oauth2/wechat/callback")
-	s.Add("/test/random")
+	s.Add("/v1/users/signup")
+	s.Add("/v1/users/login_sms/code/send")
+	s.Add("/v1/users/login_sms")
+	s.Add("/v1/users/refresh_token")
+	s.Add("/v1/users/login")
+	s.Add("/v1/oauth2/wechat/authurl")
+	s.Add("/v1/oauth2/wechat/callback")
+	s.Add("/v1/test/random")
 	return &JWTAuth{
 		publicPaths: s,
 		hdl:         hdl,

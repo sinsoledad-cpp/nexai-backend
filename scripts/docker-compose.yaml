@@ -45,11 +45,11 @@ services:
     environment:
       # 基础配置
       - POSTGRESQL_USERNAME=postgres
-      - POSTGRESQL_PASSWORD=postgres123
-      - POSTGRESQL_DATABASE=mydb
+      - POSTGRESQL_PASSWORD=root
+      - POSTGRESQL_DATABASE=nexai
 
       # 可选：允许远程连接
-      - POSTGRESQL_POSTGRES_PASSWORD=postgres123
+      - POSTGRESQL_POSTGRES_PASSWORD=root
 
       # 性能 & 编码
       - POSTGRESQL_SHARED_PRELOAD_LIBRARIES=pg_stat_statements

@@ -24,7 +24,7 @@ var _ router.Handler = (*UserHandler)(nil)
 
 const (
 	emailRegexPattern    = "(?i)^[A-Z0-9_!#$%&'*+/=?`{|}~^.-]+@[A-Z0-9.-]+$"
-	passwordRegexPattern = `^(?=.*[a-z])(?=.*[A-Z])(?=.*[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?~]).{8,}$`
+	passwordRegexPattern = `^.{1,}$` // 允许任意密码，长度至少为1
 	bizLogin             = "login"
 	bizResetPassword     = "reset-password"
 )
@@ -109,7 +109,7 @@ func (u *UserHandler) SignUp(ctx *gin.Context, req dto.SignUpRequest) (ginx.Resu
 	if !isPassword {
 		return ginx.Result{
 			Code: errs.UserInvalidInput,
-			Msg:  "密码必须包含数字、特殊字符、大小字母，并且长度不能小于 8 位",
+			Msg:  "密码不能为空",
 		}, nil
 	}
 
@@ -448,7 +448,7 @@ func (u *UserHandler) ResetPassword(ctx *gin.Context, req dto.ResetPasswordReque
 	if !isPassword {
 		return ginx.Result{
 			Code: errs.UserInvalidInput,
-			Msg:  "密码必须包含数字、特殊字符、大小字母，并且长度不能小于 8 位",
+			Msg:  "密码不能为空",
 		}, nil
 	}
 
@@ -518,7 +518,7 @@ func (u *UserHandler) ChangePassword(ctx *gin.Context, req dto.ChangePasswordReq
 	if !isPassword {
 		return ginx.Result{
 			Code: errs.UserInvalidInput,
-			Msg:  "密码必须包含数字、特殊字符、大小字母，并且长度不能小于 8 位",
+			Msg:  "密码不能为空",
 		}, nil
 	}
 

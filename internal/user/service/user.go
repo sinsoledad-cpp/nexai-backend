@@ -48,6 +48,15 @@ func (svc *DefaultUserService) Signup(ctx context.Context, u domain.User) error 
 		return err
 	}
 	u.Password = string(hash)
+
+	// 设置默认昵称和头像
+	if u.Nickname == "" {
+		u.Nickname = "用户" + u.Email[:3] // 使用邮箱前3个字符作为默认昵称
+	}
+	if u.Avatar == "" {
+		u.Avatar = "/storage/avatar/default.jpg" // 设置默认头像路径
+	}
+
 	return svc.repo.Create(ctx, u)
 }
 

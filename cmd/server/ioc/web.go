@@ -3,7 +3,6 @@ package ioc
 import (
 	"context"
 	"nexai-backend/internal/common/jwt"
-	"nexai-backend/internal/common/middleware"
 	"nexai-backend/internal/user/handler"
 	"nexai-backend/pkg/ginx"
 	ginxmw "nexai-backend/pkg/ginx/middleware"
@@ -20,6 +19,7 @@ func InitWebEngine(middlewares []gin.HandlerFunc, l logger.Logger, userHdl *hand
 	gin.ForceConsoleColor()
 	engine := gin.Default()
 	engine.Static("/uploads", "./storage/uploads")
+	engine.Static("/storage/avatar", "./storage/avatar")
 	engine.Use(middlewares...)
 	userHdl.RegisterRoutes(engine)
 	return engine
@@ -57,7 +57,7 @@ func InitGinMiddlewares(jwtHdl jwt.Handler, l logger.Logger) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		otelgin.Middleware("bedrock"),
 		corsMiddleware,
-		middleware.NewJWTAuth(jwtHdl).Middleware(),
+		//middleware.NewJWTAuth(jwtHdl).Middleware(),
 		accessLogMiddleware,
 	}
 }

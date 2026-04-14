@@ -12,7 +12,7 @@ mysql:
   dsn: "root:root@tcp(127.0.0.1:13306)/nexai?charset=utf8mb4&parseTime=True&loc=Local"
 
 postgres:
-  dsn: "host=localhost user=postgres password=postgres dbname=nexai port=15432 sslmode=disable TimeZone=Asia/Shanghai"
+  dsn: "host=localhost user=postgres password=root dbname=nexai port=15432 sslmode=disable TimeZone=Asia/Shanghai"
 
 redis:
   address: "127.0.0.1:16379"
