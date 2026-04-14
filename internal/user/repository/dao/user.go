@@ -7,7 +7,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-sql-driver/mysql"
 	"gorm.io/gorm"
 )
 
@@ -56,21 +55,17 @@ func (g *GORMUserDAO) Insert(ctx context.Context, user User) error {
 	user.Ctime = now
 	user.Utime = now
 	err := g.db.WithContext(ctx).Create(&user).Error
-	var e *mysql.MySQLError
-	if errors.As(err, &e) {
-
-		const uniqueIndexErrNo uint16 = 1062
-		if e.Number == uniqueIndexErrNo {
-
-			if strings.Contains(e.Message, "email") {
+	if err != nil {
+		// 检查是否是唯一约束冲突
+		if strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint") {
+			if strings.Contains(err.Error(), "email") {
 				return ErrDuplicateEmail
 			}
-			if strings.Contains(e.Message, "phone") {
+			if strings.Contains(err.Error(), "phone") {
 				return ErrDuplicatePhone
 			}
 			return ErrDuplicateEmail
 		}
-
 	}
 	return err
 }

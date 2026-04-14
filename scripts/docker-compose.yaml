@@ -32,6 +32,38 @@ services:
       timeout: 5s
       retries: 6
 #----------------------------------------------------------------------------------------------
+  #postgresql环境# https://github.com/bitnami/containers/tree/main/bitnami/postgresql#how-to-use-this-image
+  # todo sudo rm -rf postgresql ; sudo mkdir -p postgresql/data postgresql/conf  && sudo chown -R 1001:1001 postgresql &&  sudo docker pull registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/postgresql:15.0 && sudo docker tag registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/postgresql:15.0 bitnami/postgresql:15.0
+  postgresql:
+    image: bitnami/postgresql:latest  # sudo docker pull registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/postgresql:15.0 && sudo docker tag registry.cn-guangzhou.aliyuncs.com/dbinggo-bitnami/postgresql:15.0 bitnami/postgresql:15.0
+    container_name: nexai-postgresql # 强制指定容器的名称为 postgresql
+    hostname: postgresql # 设置容器内部的主机名为 postgresql
+    restart: unless-stopped
+#    privileged: true # 特权模式
+    ports:
+      - "15432:5432"
+    environment:
+      # 基础配置
+      - POSTGRESQL_USERNAME=postgres
+      - POSTGRESQL_PASSWORD=postgres123
+      - POSTGRESQL_DATABASE=mydb
+
+      # 可选：允许远程连接
+      - POSTGRESQL_POSTGRES_PASSWORD=postgres123
+
+      # 性能 & 编码
+      - POSTGRESQL_SHARED_PRELOAD_LIBRARIES=pg_stat_statements
+      - POSTGRESQL_CLIENT_ENCODING=UTF8
+
+    # volumes:
+    #   # 数据持久化
+    #   - ./postgresql/data:/bitnami/postgresql
+
+    #   # 自定义配置（可选）
+    #   - ./postgresql/conf/postgresql.conf:/opt/bitnami/postgresql/conf/postgresql.conf
+    networks:
+      - net01
+#----------------------------------------------------------------------------------------------
   redis:
     image: "bitnami/redis:latest"
     container_name: nexai-redis # 强制指定容器的名称为 mysql
