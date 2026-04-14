@@ -3,6 +3,7 @@ package ioc
 import (
 	"context"
 	"nexai-backend/internal/common/jwt"
+	resumehandler "nexai-backend/internal/resume/handler"
 	"nexai-backend/internal/user/handler"
 	"nexai-backend/pkg/ginx"
 	ginxmw "nexai-backend/pkg/ginx/middleware"
@@ -14,14 +15,16 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
-func InitWebEngine(middlewares []gin.HandlerFunc, l logger.Logger, userHdl *handler.UserHandler) *gin.Engine {
+func InitWebEngine(middlewares []gin.HandlerFunc, l logger.Logger, userHdl *handler.UserHandler, resumeHdl *resumehandler.ResumeHandler) *gin.Engine {
 	ginx.SetLogger(l)
 	gin.ForceConsoleColor()
 	engine := gin.Default()
 	engine.Static("/uploads", "./storage/uploads")
 	engine.Static("/storage/avatar", "./storage/avatar")
+	engine.Static("/storage/resumes", "./storage/resumes")
 	engine.Use(middlewares...)
 	userHdl.RegisterRoutes(engine)
+	resumeHdl.RegisterRoutes(engine)
 	return engine
 }
 

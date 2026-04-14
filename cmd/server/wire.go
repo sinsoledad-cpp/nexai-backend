@@ -8,6 +8,10 @@ import (
 	codecache "nexai-backend/internal/code/repository/cache"
 	codeservice "nexai-backend/internal/code/service"
 	"nexai-backend/internal/common/jwt"
+	resumehandler "nexai-backend/internal/resume/handler"
+	resumerepo "nexai-backend/internal/resume/repository"
+	resumedao "nexai-backend/internal/resume/repository/dao"
+	resumeservice "nexai-backend/internal/resume/service"
 	"nexai-backend/internal/user/handler"
 	userrepo "nexai-backend/internal/user/repository"
 	usercache "nexai-backend/internal/user/repository/cache"
@@ -37,12 +41,23 @@ var codeSvc = wire.NewSet(
 	codeservice.NewCodeService,
 )
 
+var resumeSvc = wire.NewSet(
+	resumedao.NewGORMResumeDAO,
+	resumerepo.NewCachedResumeRepository,
+	ioc2.InitChatModel,
+	resumeservice.NewParseGraph,
+	resumeservice.NewScoringAgent,
+	resumeservice.NewResumeService,
+	resumehandler.NewResumeHandler,
+)
+
 func InitApp() *App {
 	wire.Build(
 		thirdParty,
 
 		userSvc,
 		codeSvc,
+		resumeSvc,
 
 		jwt.NewRedisJWTHandler,
 		handler.NewUserHandler,

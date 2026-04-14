@@ -20,3 +20,8 @@ redis:
 kafka:
   addr:
     - "localhost:9094"
+
+llm:
+  baseURL: ""
+  apiKey: ""
+  model: ""

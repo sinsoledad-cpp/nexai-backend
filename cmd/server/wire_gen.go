@@ -13,14 +13,16 @@ import (
 	cache2 "nexai-backend/internal/code/repository/cache"
 	service2 "nexai-backend/internal/code/service"
 	"nexai-backend/internal/common/jwt"
+	resumehandler "nexai-backend/internal/resume/handler"
+	resumerepo "nexai-backend/internal/resume/repository"
+	resumedao "nexai-backend/internal/resume/repository/dao"
+	resumeservice "nexai-backend/internal/resume/service"
 	"nexai-backend/internal/user/handler"
 	"nexai-backend/internal/user/repository"
 	"nexai-backend/internal/user/repository/cache"
 	"nexai-backend/internal/user/repository/dao"
 	"nexai-backend/internal/user/service"
 )
-
-// Injectors from wire.go:
 
 func InitApp() *App {
 	cmdable := ioc.InitRedis()
@@ -37,17 +39,27 @@ func InitApp() *App {
 	smsService := ioc.InitSMSService()
 	codeService := service2.NewCodeService(codeRepository, smsService)
 	userHandler := handler.NewUserHandler(logger, userService, codeService, jwtHandler)
-	engine := ioc.InitWebEngine(v, logger, userHandler)
+	chatModel := ioc.InitChatModel()
+	parseGraph, err := resumeservice.NewParseGraph(logger, chatModel)
+	if err != nil {
+		panic(err)
+	}
+	scoringAgent := resumeservice.NewScoringAgent(logger, chatModel)
+	resumeDAO := resumedao.NewGORMResumeDAO(db)
+	resumeRepository := resumerepo.NewCachedResumeRepository(resumeDAO, logger)
+	resumeService := resumeservice.NewResumeService(logger, resumeRepository, parseGraph, scoringAgent)
+	resumeHandler := resumehandler.NewResumeHandler(logger, resumeService)
+	engine := ioc.InitWebEngine(v, logger, userHandler, resumeHandler)
 	app := &App{
 		engine: engine,
 	}
 	return app
 }
 
-// wire.go:
-
 var thirdParty = wire.NewSet(ioc.InitLogger, ioc.InitPostgreSQL, ioc.InitRedis)
 
 var userSvc = wire.NewSet(cache.NewRedisUserCache, dao.NewGORMUserDAO, repository.NewCachedUserRepository, service.NewUserService)
 
 var codeSvc = wire.NewSet(cache2.NewRedisCodeCache, repository2.NewCachedCodeRepository, ioc.InitSMSService, service2.NewCodeService)
+
+var resumeSvc = wire.NewSet(resumedao.NewGORMResumeDAO, resumerepo.NewCachedResumeRepository, ioc.InitChatModel, resumeservice.NewParseGraph, resumeservice.NewScoringAgent, resumeservice.NewResumeService, resumehandler.NewResumeHandler)
