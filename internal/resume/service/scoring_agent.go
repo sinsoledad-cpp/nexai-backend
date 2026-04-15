@@ -12,11 +12,13 @@ import (
 	"github.com/cloudwego/eino/components/model"
 )
 
+// ScoringAgent 评分代理
 type ScoringAgent struct {
-	l         logger.Logger
-	chatModel model.BaseChatModel
+	l         logger.Logger       // 日志记录器
+	chatModel model.BaseChatModel // 聊天模型
 }
 
+// NewScoringAgent 创建评分代理实例
 func NewScoringAgent(l logger.Logger, chatModel model.BaseChatModel) *ScoringAgent {
 	return &ScoringAgent{
 		l:         l,
@@ -24,20 +26,25 @@ func NewScoringAgent(l logger.Logger, chatModel model.BaseChatModel) *ScoringAge
 	}
 }
 
+// Evaluate 评估简历
 func (sa *ScoringAgent) Evaluate(ctx context.Context, parsedData string, targetPosition string) (domain.ScoreResult, error) {
+	// 解析简历数据
 	var parsed domain.ParsedResume
 	if err := json.Unmarshal([]byte(parsedData), &parsed); err != nil {
 		return domain.ScoreResult{}, fmt.Errorf("解析简历数据失败: %w", err)
 	}
 
-	completeness := sa.evaluateCompleteness(parsed)
-	professionalism := sa.evaluateProfessionalism(ctx, parsed, targetPosition)
-	quantification := sa.evaluateQuantification(parsed)
-	formatScore := sa.evaluateFormat(parsed)
+	// 评估各维度
+	completeness := sa.evaluateCompleteness(parsed)                            // 评估完整度
+	professionalism := sa.evaluateProfessionalism(ctx, parsed, targetPosition) // 评估专业度
+	quantification := sa.evaluateQuantification(parsed)                        // 评估量化度
+	formatScore := sa.evaluateFormat(parsed)                                   // 评估格式
 
+	// 获取岗位权重并计算综合评分
 	weights := sa.getPositionWeights(targetPosition)
 	overallScore := sa.calculateOverall(weights, completeness, professionalism, quantification, formatScore)
 
+	// 生成改进建议
 	recommendations := sa.generateRecommendations(parsed, completeness, professionalism, quantification, formatScore, targetPosition)
 
 	return domain.ScoreResult{
@@ -52,10 +59,12 @@ func (sa *ScoringAgent) Evaluate(ctx context.Context, parsedData string, targetP
 	}, nil
 }
 
+// evaluateCompleteness 评估完整度
 func (sa *ScoringAgent) evaluateCompleteness(parsed domain.ParsedResume) domain.DimensionScore {
 	score := 100
 	var reasons []string
 
+	// 检查个人信息
 	if parsed.PersonalInfo.Name == "" || parsed.PersonalInfo.Name == "未知" {
 		score -= 15
 		reasons = append(reasons, "缺少姓名信息")
@@ -68,27 +77,37 @@ func (sa *ScoringAgent) evaluateCompleteness(parsed domain.ParsedResume) domain.
 		score -= 10
 		reasons = append(reasons, "缺少邮箱地址")
 	}
+
+	// 检查教育背景
 	if len(parsed.Education) == 0 {
 		score -= 20
 		reasons = append(reasons, "缺少教育背景")
 	}
+
+	// 检查工作经历
 	if len(parsed.WorkExperience) == 0 {
 		score -= 20
 		reasons = append(reasons, "缺少工作经历")
 	}
+
+	// 检查技能信息
 	if len(parsed.Skills) == 0 {
 		score -= 10
 		reasons = append(reasons, "缺少技能信息")
 	}
+
+	// 检查个人简介
 	if parsed.PersonalInfo.Summary == "" {
 		score -= 10
 		reasons = append(reasons, "缺少个人简介/优势描述")
 	}
 
+	// 确保分数在0-100之间
 	if score < 0 {
 		score = 0
 	}
 
+	// 添加正面评价
 	if len(reasons) == 0 {
 		reasons = append(reasons, "简历信息完整，各关键模块齐全")
 	}
@@ -99,34 +118,41 @@ func (sa *ScoringAgent) evaluateCompleteness(parsed domain.ParsedResume) domain.
 	}
 }
 
+// evaluateProfessionalism 评估专业度
 func (sa *ScoringAgent) evaluateProfessionalism(ctx context.Context, parsed domain.ParsedResume, targetPosition string) domain.DimensionScore {
 	score := 60
 	var reasons []string
 
+	// 专业术语关键词
 	professionalKeywords := []string{
 		"主导", "负责", "设计", "实现", "优化", "重构", "落地",
 		"架构", "方案", "规划", "推动", "交付", "提升", "降低",
 		"搭建", "构建", "解决", "攻克", "突破",
 	}
 
+	// 弱化词
 	weakKeywords := []string{
 		"参与", "协助", "帮忙", "了解", "知道", "简单",
 	}
 
+	// 统计专业术语和弱化词出现次数
 	professionalCount := 0
 	weakCount := 0
 	allText := sa.concatAllText(parsed)
 
+	// 统计专业术语
 	for _, kw := range professionalKeywords {
 		count := strings.Count(allText, kw)
 		professionalCount += count
 	}
 
+	// 统计弱化词
 	for _, kw := range weakKeywords {
 		count := strings.Count(allText, kw)
 		weakCount += count
 	}
 
+	// 根据专业术语数量加分
 	if professionalCount >= 5 {
 		score += 25
 		reasons = append(reasons, "使用了大量专业行业术语，表达专业")
@@ -137,11 +163,13 @@ func (sa *ScoringAgent) evaluateProfessionalism(ctx context.Context, parsed doma
 		reasons = append(reasons, "专业术语使用较少，建议使用更专业的表述")
 	}
 
+	// 弱化词扣分
 	if weakCount > 3 {
 		score -= 10
 		reasons = append(reasons, "使用了较多弱化词（如'参与'、'协助'），建议替换为更主动的表述")
 	}
 
+	// 岗位匹配度评估
 	if targetPosition != "" {
 		positionKeywords := sa.getPositionKeywords(targetPosition)
 		matchCount := 0
@@ -161,6 +189,7 @@ func (sa *ScoringAgent) evaluateProfessionalism(ctx context.Context, parsed doma
 		}
 	}
 
+	// 确保分数在0-100之间
 	if score > 100 {
 		score = 100
 	}
@@ -168,6 +197,7 @@ func (sa *ScoringAgent) evaluateProfessionalism(ctx context.Context, parsed doma
 		score = 0
 	}
 
+	// 添加默认评价
 	if len(reasons) == 0 {
 		reasons = append(reasons, "专业度评估完成")
 	}
@@ -178,10 +208,12 @@ func (sa *ScoringAgent) evaluateProfessionalism(ctx context.Context, parsed doma
 	}
 }
 
+// evaluateQuantification 评估量化度
 func (sa *ScoringAgent) evaluateQuantification(parsed domain.ParsedResume) domain.DimensionScore {
 	score := 50
 	var reasons []string
 
+	// 量化数据模式
 	quantPatterns := []*regexp.Regexp{
 		regexp.MustCompile(`\d+%`),
 		regexp.MustCompile(`\d+万`),
@@ -202,6 +234,7 @@ func (sa *ScoringAgent) evaluateQuantification(parsed domain.ParsedResume) domai
 		regexp.MustCompile(`节省\s*\d+`),
 	}
 
+	// 统计量化数据
 	allText := sa.concatAllText(parsed)
 	quantCount := 0
 	for _, pattern := range quantPatterns {
@@ -209,6 +242,7 @@ func (sa *ScoringAgent) evaluateQuantification(parsed domain.ParsedResume) domai
 		quantCount += len(matches)
 	}
 
+	// 根据量化数据数量加分
 	if quantCount >= 5 {
 		score += 40
 		reasons = append(reasons, "工作描述中包含丰富的量化数据，非常有说服力")
@@ -222,18 +256,21 @@ func (sa *ScoringAgent) evaluateQuantification(parsed domain.ParsedResume) domai
 		reasons = append(reasons, "工作描述中缺乏量化数据，建议使用STAR法则补充具体成果数据")
 	}
 
+	// 工作经历描述长度加分
 	for _, work := range parsed.WorkExperience {
 		if work.Description != "" && len(work.Description) > 50 {
 			score += 3
 		}
 	}
 
+	// 项目经验描述长度加分
 	for _, proj := range parsed.Projects {
 		if proj.Description != "" && len(proj.Description) > 50 {
 			score += 3
 		}
 	}
 
+	// 确保分数在0-100之间
 	if score > 100 {
 		score = 100
 	}
@@ -241,6 +278,7 @@ func (sa *ScoringAgent) evaluateQuantification(parsed domain.ParsedResume) domai
 		score = 0
 	}
 
+	// 添加默认评价
 	if len(reasons) == 0 {
 		reasons = append(reasons, "量化度评估完成")
 	}
@@ -251,10 +289,12 @@ func (sa *ScoringAgent) evaluateQuantification(parsed domain.ParsedResume) domai
 	}
 }
 
+// evaluateFormat 评估格式
 func (sa *ScoringAgent) evaluateFormat(parsed domain.ParsedResume) domain.DimensionScore {
 	score := 70
 	var reasons []string
 
+	// 检查工作经历时间信息
 	if len(parsed.WorkExperience) > 0 {
 		hasDateRange := false
 		for _, work := range parsed.WorkExperience {
@@ -271,6 +311,7 @@ func (sa *ScoringAgent) evaluateFormat(parsed domain.ParsedResume) domain.Dimens
 		}
 	}
 
+	// 检查教育背景学位信息
 	if len(parsed.Education) > 0 {
 		hasDegree := false
 		for _, edu := range parsed.Education {
@@ -287,6 +328,7 @@ func (sa *ScoringAgent) evaluateFormat(parsed domain.ParsedResume) domain.Dimens
 		}
 	}
 
+	// 技能列表长度评估
 	if len(parsed.Skills) >= 5 {
 		score += 10
 	} else if len(parsed.Skills) >= 3 {
@@ -295,14 +337,17 @@ func (sa *ScoringAgent) evaluateFormat(parsed domain.ParsedResume) domain.Dimens
 		reasons = append(reasons, "技能列表较少，建议补充更多相关技能")
 	}
 
+	// 工作经历数量评估
 	if len(parsed.WorkExperience) >= 2 {
 		score += 5
 	}
 
+	// 项目经验数量评估
 	if len(parsed.Projects) >= 1 {
 		score += 5
 	}
 
+	// 确保分数在0-100之间
 	if score > 100 {
 		score = 100
 	}
@@ -310,6 +355,7 @@ func (sa *ScoringAgent) evaluateFormat(parsed domain.ParsedResume) domain.Dimens
 		score = 0
 	}
 
+	// 添加正面评价
 	if len(reasons) == 0 {
 		reasons = append(reasons, "简历格式规范，结构清晰")
 	}
@@ -320,16 +366,19 @@ func (sa *ScoringAgent) evaluateFormat(parsed domain.ParsedResume) domain.Dimens
 	}
 }
 
+// positionWeight 岗位权重
 type positionWeight struct {
-	completeness    float64
-	professionalism float64
-	quantification  float64
-	format          float64
+	completeness    float64 // 完整度权重
+	professionalism float64 // 专业度权重
+	quantification  float64 // 量化度权重
+	format          float64 // 格式权重
 }
 
+// getPositionWeights 获取岗位权重
 func (sa *ScoringAgent) getPositionWeights(position string) positionWeight {
 	position = strings.ToLower(position)
 
+	// 根据岗位类型返回不同权重
 	switch {
 	case strings.Contains(position, "前端") || strings.Contains(position, "frontend"):
 		return positionWeight{0.25, 0.30, 0.25, 0.20}
@@ -346,6 +395,7 @@ func (sa *ScoringAgent) getPositionWeights(position string) positionWeight {
 	}
 }
 
+// calculateOverall 计算综合评分
 func (sa *ScoringAgent) calculateOverall(weights positionWeight, completeness, professionalism, quantification, format domain.DimensionScore) int {
 	score := float64(completeness.Score)*weights.completeness +
 		float64(professionalism.Score)*weights.professionalism +
@@ -355,6 +405,7 @@ func (sa *ScoringAgent) calculateOverall(weights positionWeight, completeness, p
 	return int(score)
 }
 
+// getPositionKeywords 获取岗位关键词
 func (sa *ScoringAgent) getPositionKeywords(position string) []string {
 	position = strings.ToLower(position)
 
@@ -376,25 +427,31 @@ func (sa *ScoringAgent) getPositionKeywords(position string) []string {
 	return []string{}
 }
 
+// generateRecommendations 生成改进建议
 func (sa *ScoringAgent) generateRecommendations(parsed domain.ParsedResume, completeness, professionalism, quantification, format domain.DimensionScore, targetPosition string) []string {
 	var recs []string
 
+	// 完整度建议
 	if completeness.Score < 70 {
 		recs = append(recs, "建议补充简历中的缺失信息，确保联系方式、教育背景和工作经历完整")
 	}
 
+	// 专业度建议
 	if professionalism.Score < 70 {
 		recs = append(recs, "建议使用更专业的行业术语，如'主导'、'落地'、'重构'等，替代弱化词")
 	}
 
+	// 量化度建议
 	if quantification.Score < 70 {
 		recs = append(recs, "建议在工作描述中使用STAR法则，补充具体的量化数据（如百分比、金额、时间缩短等）")
 	}
 
+	// 格式建议
 	if format.Score < 70 {
 		recs = append(recs, "建议优化简历格式，确保时间线完整、技能列表充实")
 	}
 
+	// 岗位匹配建议
 	if targetPosition != "" {
 		keywords := sa.getPositionKeywords(targetPosition)
 		if len(keywords) > 0 {
@@ -411,6 +468,7 @@ func (sa *ScoringAgent) generateRecommendations(parsed domain.ParsedResume, comp
 		}
 	}
 
+	// 添加默认建议
 	if len(recs) == 0 {
 		recs = append(recs, "简历质量良好，继续保持")
 	}
@@ -418,6 +476,7 @@ func (sa *ScoringAgent) generateRecommendations(parsed domain.ParsedResume, comp
 	return recs
 }
 
+// concatAllText 拼接所有文本
 func (sa *ScoringAgent) concatAllText(parsed domain.ParsedResume) string {
 	var sb strings.Builder
 	sb.WriteString(parsed.PersonalInfo.Summary)

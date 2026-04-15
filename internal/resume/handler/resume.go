@@ -21,11 +21,13 @@ import (
 
 var _ router.Handler = (*ResumeHandler)(nil)
 
+// ResumeHandler 简历处理器
 type ResumeHandler struct {
-	log logger.Logger
-	svc resumeservice.ResumeService
+	log logger.Logger               // 日志记录器
+	svc resumeservice.ResumeService // 简历服务
 }
 
+// NewResumeHandler 创建简历处理器实例
 func NewResumeHandler(log logger.Logger, svc resumeservice.ResumeService) *ResumeHandler {
 	return &ResumeHandler{
 		log: log,
@@ -33,17 +35,19 @@ func NewResumeHandler(log logger.Logger, svc resumeservice.ResumeService) *Resum
 	}
 }
 
+// RegisterRoutes 注册路由
 func (h *ResumeHandler) RegisterRoutes(e *gin.Engine) {
 	v1 := e.Group("/v1")
 	resumes := v1.Group("/resumes")
 
-	resumes.POST("/upload", ginx.WrapClaims(h.Upload))
-	resumes.POST("/parse", ginx.WrapBody(h.Parse))
-	resumes.POST("/correct", ginx.WrapBody(h.Correct))
-	resumes.POST("/score", ginx.WrapBody(h.Score))
-	resumes.GET("/:id", ginx.Wrap(h.GetById))
+	resumes.POST("/upload", ginx.WrapClaims(h.Upload)) // 上传简历
+	resumes.POST("/parse", ginx.WrapBody(h.Parse))     // 解析简历
+	resumes.POST("/correct", ginx.WrapBody(h.Correct)) // 修正简历
+	resumes.POST("/score", ginx.WrapBody(h.Score))     // 评分简历
+	resumes.GET("/:id", ginx.Wrap(h.GetById))          // 获取简历
 }
 
+// Upload 处理文件上传
 func (h *ResumeHandler) Upload(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result, error) {
 	file, header, err := ctx.Request.FormFile("file")
 	if err != nil {
@@ -54,6 +58,7 @@ func (h *ResumeHandler) Upload(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result
 	}
 	defer file.Close()
 
+	// 检查文件类型
 	ext := strings.ToLower(filepath.Ext(header.Filename))
 	if ext != ".pdf" && ext != ".docx" && ext != ".doc" && ext != ".png" && ext != ".jpg" && ext != ".jpeg" {
 		return ginx.Result{
@@ -62,6 +67,7 @@ func (h *ResumeHandler) Upload(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result
 		}, nil
 	}
 
+	// 读取文件数据
 	fileData, err := io.ReadAll(file)
 	if err != nil {
 		return ginx.Result{
@@ -70,6 +76,7 @@ func (h *ResumeHandler) Upload(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result
 		}, err
 	}
 
+	// 检查文件大小
 	if len(fileData) > 10<<20 {
 		return ginx.Result{
 			Code: errs.ResumeFileTooLarge,
@@ -77,6 +84,7 @@ func (h *ResumeHandler) Upload(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result
 		}, nil
 	}
 
+	// 调用服务上传文件
 	resume, err := h.svc.Upload(ctx.Request.Context(), uc.Uid, header.Filename, fileData)
 	if err != nil {
 		if errors.Is(err, resumeservice.ErrFileTypeUnsupported) {
@@ -108,6 +116,7 @@ func (h *ResumeHandler) Upload(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result
 	}, nil
 }
 
+// Parse 处理简历解析
 func (h *ResumeHandler) Parse(ctx *gin.Context, req dto.ParseRequest) (ginx.Result, error) {
 	parsed, err := h.svc.Parse(ctx.Request.Context(), 0, req.FileID)
 	if err != nil {
@@ -136,6 +145,7 @@ func (h *ResumeHandler) Parse(ctx *gin.Context, req dto.ParseRequest) (ginx.Resu
 	}, nil
 }
 
+// Correct 处理简历修正
 func (h *ResumeHandler) Correct(ctx *gin.Context, req dto.CorrectRequest) (ginx.Result, error) {
 	parsed := h.toDomainParsed(req.Parsed)
 	result, err := h.svc.Correct(ctx.Request.Context(), 0, req.FileID, parsed)
@@ -159,6 +169,7 @@ func (h *ResumeHandler) Correct(ctx *gin.Context, req dto.CorrectRequest) (ginx.
 	}, nil
 }
 
+// Score 处理简历评分
 func (h *ResumeHandler) Score(ctx *gin.Context, req dto.ScoreRequest) (ginx.Result, error) {
 	result, err := h.svc.Score(ctx.Request.Context(), 0, req.FileID, req.TargetPosition)
 	if err != nil {
@@ -187,6 +198,7 @@ func (h *ResumeHandler) Score(ctx *gin.Context, req dto.ScoreRequest) (ginx.Resu
 	}, nil
 }
 
+// GetById 根据ID获取简历
 func (h *ResumeHandler) GetById(ctx *gin.Context) (ginx.Result, error) {
 	idStr := ctx.Param("id")
 	var id int64
@@ -219,6 +231,7 @@ func (h *ResumeHandler) GetById(ctx *gin.Context) (ginx.Result, error) {
 	}, nil
 }
 
+// toParseResponse 将领域模型转换为响应DTO
 func (h *ResumeHandler) toParseResponse(parsed domain.ParsedResume) dto.ParseResponse {
 	resp := dto.ParseResponse{
 		PersonalInfo: dto.PersonalInfoDTO{
@@ -264,6 +277,7 @@ func (h *ResumeHandler) toParseResponse(parsed domain.ParsedResume) dto.ParseRes
 	return resp
 }
 
+// toDomainParsed 将响应DTO转换为领域模型
 func (h *ResumeHandler) toDomainParsed(dtoParsed dto.ParseResponse) domain.ParsedResume {
 	parsed := domain.ParsedResume{
 		PersonalInfo: domain.PersonalInfo{
@@ -309,6 +323,7 @@ func (h *ResumeHandler) toDomainParsed(dtoParsed dto.ParseResponse) domain.Parse
 	return parsed
 }
 
+// toScoreResponse 将评分结果转换为响应DTO
 func (h *ResumeHandler) toScoreResponse(result domain.ScoreResult) dto.ScoreResponse {
 	return dto.ScoreResponse{
 		ResumeID:        result.ResumeID,

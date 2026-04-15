@@ -1,81 +1,93 @@
 package dto
 
+// UploadResponse 上传响应
 type UploadResponse struct {
-	FileID   int64  `json:"fileId"`
-	FileName string `json:"fileName"`
-	FileType string `json:"fileType"`
+	FileID   int64  `json:"fileId"`   // 文件ID
+	FileName string `json:"fileName"` // 文件名
+	FileType string `json:"fileType"` // 文件类型
 }
 
+// ParseRequest 解析请求
 type ParseRequest struct {
-	FileID int64 `json:"fileId" binding:"required"`
+	FileID int64 `json:"fileId" binding:"required"` // 文件ID
 }
 
+// ParseResponse 解析响应
 type ParseResponse struct {
-	PersonalInfo   PersonalInfoDTO     `json:"personalInfo"`
-	Education      []EducationDTO      `json:"education"`
-	WorkExperience []WorkExperienceDTO `json:"workExperience"`
-	Projects       []ProjectDTO        `json:"projects"`
-	Skills         []string            `json:"skills"`
+	PersonalInfo   PersonalInfoDTO     `json:"personalInfo"`   // 个人信息
+	Education      []EducationDTO      `json:"education"`      // 教育背景
+	WorkExperience []WorkExperienceDTO `json:"workExperience"` // 工作经历
+	Projects       []ProjectDTO        `json:"projects"`       // 项目经验
+	Skills         []string            `json:"skills"`         // 技能栈
 }
 
+// PersonalInfoDTO 个人信息DTO
 type PersonalInfoDTO struct {
-	Name    string `json:"name"`
-	Phone   string `json:"phone"`
-	Email   string `json:"email"`
-	Address string `json:"address"`
-	Summary string `json:"summary"`
+	Name    string `json:"name"`    // 姓名
+	Phone   string `json:"phone"`   // 手机号码
+	Email   string `json:"email"`   // 邮箱地址
+	Address string `json:"address"` // 地址
+	Summary string `json:"summary"` // 个人简介/优势
 }
 
+// EducationDTO 教育背景DTO
 type EducationDTO struct {
-	School    string `json:"school"`
-	Degree    string `json:"degree"`
-	Major     string `json:"major"`
-	StartDate string `json:"startDate"`
-	EndDate   string `json:"endDate"`
+	School    string `json:"school"`    // 学校名称
+	Degree    string `json:"degree"`    // 学位
+	Major     string `json:"major"`     // 专业
+	StartDate string `json:"startDate"` // 开始时间
+	EndDate   string `json:"endDate"`   // 结束时间
 }
 
+// WorkExperienceDTO 工作经历DTO
 type WorkExperienceDTO struct {
-	Company     string `json:"company"`
-	Position    string `json:"position"`
-	StartDate   string `json:"startDate"`
-	EndDate     string `json:"endDate"`
-	Description string `json:"description"`
+	Company     string `json:"company"`     // 公司名称
+	Position    string `json:"position"`    // 职位
+	StartDate   string `json:"startDate"`   // 开始时间
+	EndDate     string `json:"endDate"`     // 结束时间
+	Description string `json:"description"` // 工作描述
 }
 
+// ProjectDTO 项目经验DTO
 type ProjectDTO struct {
-	Name        string `json:"name"`
-	Role        string `json:"role"`
-	StartDate   string `json:"startDate"`
-	EndDate     string `json:"endDate"`
-	Description string `json:"description"`
+	Name        string `json:"name"`        // 项目名称
+	Role        string `json:"role"`        // 角色
+	StartDate   string `json:"startDate"`   // 开始时间
+	EndDate     string `json:"endDate"`     // 结束时间
+	Description string `json:"description"` // 项目描述
 }
 
+// CorrectRequest 修正请求
 type CorrectRequest struct {
-	FileID int64         `json:"fileId" binding:"required"`
-	Parsed ParseResponse `json:"parsed" binding:"required"`
+	FileID int64         `json:"fileId" binding:"required"` // 文件ID
+	Parsed ParseResponse `json:"parsed" binding:"required"` // 修正后的解析数据
 }
 
+// ScoreRequest 评分请求
 type ScoreRequest struct {
-	FileID         int64  `json:"fileId" binding:"required"`
-	TargetPosition string `json:"targetPosition" binding:"required"`
+	FileID         int64  `json:"fileId" binding:"required"`         // 文件ID
+	TargetPosition string `json:"targetPosition" binding:"required"` // 意向岗位
 }
 
+// ScoreResponse 评分响应
 type ScoreResponse struct {
-	ResumeID        int64              `json:"resumeId"`
-	OverallScore    int                `json:"overallScore"`
-	Dimensions      ScoreDimensionsDTO `json:"dimensions"`
-	Recommendations []string           `json:"recommendations"`
-	TargetPosition  string             `json:"targetPosition"`
+	ResumeID        int64              `json:"resumeId"`        // 简历ID
+	OverallScore    int                `json:"overallScore"`    // 综合评分
+	Dimensions      ScoreDimensionsDTO `json:"dimensions"`      // 各维度评分
+	Recommendations []string           `json:"recommendations"` // 改进建议
+	TargetPosition  string             `json:"targetPosition"`  // 意向岗位
 }
 
+// ScoreDimensionsDTO 评分维度DTO
 type ScoreDimensionsDTO struct {
-	Completeness    DimensionScoreDTO `json:"completeness"`
-	Professionalism DimensionScoreDTO `json:"professionalism"`
-	Quantification  DimensionScoreDTO `json:"quantification"`
-	Format          DimensionScoreDTO `json:"format"`
+	Completeness    DimensionScoreDTO `json:"completeness"`    // 完整度评分
+	Professionalism DimensionScoreDTO `json:"professionalism"` // 专业度评分
+	Quantification  DimensionScoreDTO `json:"quantification"`  // 量化度评分
+	Format          DimensionScoreDTO `json:"format"`          // 排版视觉评分
 }
 
+// DimensionScoreDTO 维度评分DTO
 type DimensionScoreDTO struct {
-	Score   int      `json:"score"`
-	Reasons []string `json:"reasons"`
+	Score   int      `json:"score"`   // 分数（0-100）
+	Reasons []string `json:"reasons"` // 评分理由
 }
