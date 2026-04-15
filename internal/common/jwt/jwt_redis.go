@@ -2,13 +2,13 @@ package jwt
 
 import (
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
-
-	"strings"
-	"time"
 )
 
 var _ Handler = &RedisJWTHandler{}
@@ -38,56 +38,72 @@ func (r *RedisJWTHandler) CheckSession(ctx *gin.Context, ssid string) error {
 	return nil
 }
 
-// ExtractTokenString 根据约定，token 在 Authorization 头部  Bearer XXXX
 func (r *RedisJWTHandler) ExtractTokenString(ctx *gin.Context) string {
 	authCode := ctx.GetHeader("Authorization")
 	if authCode == "" {
 		return authCode
 	}
-	segs := strings.Split(authCode, " ") //segments
+	segs := strings.Split(authCode, " ")
 	if len(segs) != 2 {
 		return ""
 	}
 	return segs[1]
 }
 
-func (r *RedisJWTHandler) SetLoginToken(ctx *gin.Context, uid int64) error {
+func (r *RedisJWTHandler) SetLoginToken(ctx *gin.Context, uid int64) (TokenPair, error) {
 	ssid := uuid.New().String()
-	err := r.setRefreshToken(ctx, uid, ssid)
+	refreshToken, err := r.generateRefreshToken(uid, ssid)
 	if err != nil {
-		return err
+		return TokenPair{}, err
 	}
-	return r.SetJWTToken(ctx, uid, ssid)
+	accessToken, err := r.generateAccessToken(uid, ssid)
+	if err != nil {
+		return TokenPair{}, err
+	}
+	ctx.Header("X-Jwt-Token", accessToken)
+	ctx.Header("X-Refresh-Token", refreshToken)
+	return TokenPair{
+		AccessToken:  accessToken,
+		RefreshToken: refreshToken,
+	}, nil
 }
 
 func (r *RedisJWTHandler) ClearToken(ctx *gin.Context) error {
-	ctx.Header("x-jwt-token", "")
-	ctx.Header("x-refresh-token", "")
-	uc := ctx.MustGet("user").(UserClaims)
-
+	ctx.Header("X-Jwt-Token", "")
+	ctx.Header("X-Refresh-Token", "")
+	val, exists := ctx.Get("user")
+	if !exists {
+		return nil
+	}
+	uc, ok := val.(UserClaims)
+	if !ok {
+		return nil
+	}
 	return r.client.Set(ctx, fmt.Sprintf("users:ssid:%s", uc.Ssid), "", r.rcExpiration).Err()
 }
 
-func (r *RedisJWTHandler) SetJWTToken(ctx *gin.Context, uid int64, ssid string) error {
+func (r *RedisJWTHandler) SetJWTToken(ctx *gin.Context, uid int64, ssid string) (string, error) {
+	tokenStr, err := r.generateAccessToken(uid, ssid)
+	if err != nil {
+		return "", err
+	}
+	ctx.Header("X-Jwt-Token", tokenStr)
+	return tokenStr, nil
+}
+
+func (r *RedisJWTHandler) generateAccessToken(uid int64, ssid string) (string, error) {
 	uc := UserClaims{
-		Uid:       uid,
-		Ssid:      ssid,
-		UserAgent: ctx.GetHeader("User-Agent"),
+		Uid:  uid,
+		Ssid: ssid,
 		RegisteredClaims: jwt.RegisteredClaims{
-			// 1 分钟过期
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Minute * 60)),
 		},
 	}
 	token := jwt.NewWithClaims(r.signingMethod, uc)
-	tokenStr, err := token.SignedString(AccessTokenKey)
-	if err != nil {
-		return err
-	}
-	ctx.Header("x-jwt-token", tokenStr)
-	return nil
+	return token.SignedString(AccessTokenKey)
 }
 
-func (r *RedisJWTHandler) setRefreshToken(ctx *gin.Context, uid int64, ssid string) error {
+func (r *RedisJWTHandler) generateRefreshToken(uid int64, ssid string) (string, error) {
 	rc := RefreshClaims{
 		Uid:  uid,
 		Ssid: ssid,
@@ -96,10 +112,5 @@ func (r *RedisJWTHandler) setRefreshToken(ctx *gin.Context, uid int64, ssid stri
 		},
 	}
 	token := jwt.NewWithClaims(r.signingMethod, rc)
-	tokenStr, err := token.SignedString(RefreshTokenKey)
-	if err != nil {
-		return err
-	}
-	ctx.Header("x-refresh-token", tokenStr)
-	return nil
+	return token.SignedString(RefreshTokenKey)
 }

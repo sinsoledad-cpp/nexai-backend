@@ -3,11 +3,13 @@ package ioc
 import (
 	"context"
 	"nexai-backend/internal/common/jwt"
+	"nexai-backend/internal/common/middleware"
 	resumehandler "nexai-backend/internal/resume/handler"
 	"nexai-backend/internal/user/handler"
 	"nexai-backend/pkg/ginx"
 	ginxmw "nexai-backend/pkg/ginx/middleware"
 	"nexai-backend/pkg/logger"
+	"os"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -19,9 +21,14 @@ func InitWebEngine(middlewares []gin.HandlerFunc, l logger.Logger, userHdl *hand
 	ginx.SetLogger(l)
 	gin.ForceConsoleColor()
 	engine := gin.Default()
+
+	dirs := []string{"./storage/uploads/avatars", "./storage/avatar", "./storage/resumes"}
+	for _, dir := range dirs {
+		_ = os.MkdirAll(dir, 0755)
+	}
+
+	engine.Static("/storage", "./storage")
 	engine.Static("/uploads", "./storage/uploads")
-	engine.Static("/storage/avatar", "./storage/avatar")
-	engine.Static("/storage/resumes", "./storage/resumes")
 	engine.Use(middlewares...)
 	userHdl.RegisterRoutes(engine)
 	resumeHdl.RegisterRoutes(engine)
@@ -60,7 +67,7 @@ func InitGinMiddlewares(jwtHdl jwt.Handler, l logger.Logger) []gin.HandlerFunc {
 	return []gin.HandlerFunc{
 		otelgin.Middleware("bedrock"),
 		corsMiddleware,
-		//middleware.NewJWTAuth(jwtHdl).Middleware(),
+		middleware.NewJWTAuth(jwtHdl).Middleware(),
 		accessLogMiddleware,
 	}
 }

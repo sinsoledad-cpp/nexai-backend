@@ -13,6 +13,7 @@ import (
 )
 
 var (
+	ErrDuplicatePhone        = repository.ErrDuplicatePhone
 	ErrDuplicateEmail        = repository.ErrDuplicateEmail
 	ErrInvalidUserOrPassword = errors.New("用户不存在或者密码不对")
 )
@@ -23,6 +24,8 @@ type UserService interface {
 	Login(ctx context.Context, email string, password string) (domain.User, error)
 	UpdateAvatarPath(ctx context.Context, uid int64, newPath string) error
 	UpdateNonSensitiveInfo(ctx context.Context, user domain.User) error
+	UpdateEmail(ctx context.Context, uid int64, email string) error
+	UpdatePhone(ctx context.Context, uid int64, phone string) error
 	FindById(ctx context.Context, uid int64) (domain.User, error)
 	FindOrCreate(ctx context.Context, phone string) (domain.User, error)
 	ResetPasswordByPhone(ctx context.Context, phone string, password string) error
@@ -54,7 +57,7 @@ func (svc *DefaultUserService) Signup(ctx context.Context, u domain.User) error 
 		u.Nickname = "用户" + u.Email[:3] // 使用邮箱前3个字符作为默认昵称
 	}
 	if u.Avatar == "" {
-		u.Avatar = "/storage/avatar/default.jpg" // 设置默认头像路径
+		u.Avatar = ""
 	}
 
 	return svc.repo.Create(ctx, u)
@@ -194,5 +197,19 @@ func (svc *DefaultUserService) ChangePassword(ctx context.Context, uid int64, ol
 	return svc.repo.UpdateNonZeroFields(ctx, domain.User{
 		ID:       uid,
 		Password: string(hash),
+	})
+}
+
+func (svc *DefaultUserService) UpdateEmail(ctx context.Context, uid int64, email string) error {
+	return svc.repo.UpdateNonZeroFields(ctx, domain.User{
+		ID:    uid,
+		Email: email,
+	})
+}
+
+func (svc *DefaultUserService) UpdatePhone(ctx context.Context, uid int64, phone string) error {
+	return svc.repo.UpdateNonZeroFields(ctx, domain.User{
+		ID:    uid,
+		Phone: phone,
 	})
 }

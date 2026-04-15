@@ -100,6 +100,12 @@ func (g *GORMUserDAO) UpdateById(ctx context.Context, user User) error {
 	if user.Password != "" {
 		updates["password"] = user.Password
 	}
+	if user.Email.Valid {
+		updates["email"] = user.Email
+	}
+	if user.Phone.Valid {
+		updates["phone"] = user.Phone
+	}
 	return g.db.WithContext(ctx).Model(&user).Where("id = ?", user.ID).
 		Updates(updates).Error
 }
