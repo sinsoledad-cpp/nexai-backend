@@ -32,11 +32,11 @@ type ResumeService interface {
 type DefaultResumeService struct {
 	l      logger.Logger
 	repo   repository.ResumeRepository
-	parser *ParseGraph
-	scorer *ScoringAgent
+	parser *ParseWorkflow
+	scorer *ScoringWorkflow
 }
 
-func NewResumeService(l logger.Logger, repo repository.ResumeRepository, parser *ParseGraph, scorer *ScoringAgent) ResumeService {
+func NewResumeService(l logger.Logger, repo repository.ResumeRepository, parser *ParseWorkflow, scorer *ScoringWorkflow) ResumeService {
 	return &DefaultResumeService{
 		l:      l,
 		repo:   repo,

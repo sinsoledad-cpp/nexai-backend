@@ -40,14 +40,17 @@ func InitApp() *App {
 	codeService := service2.NewCodeService(codeRepository, smsService)
 	userHandler := handler.NewUserHandler(logger, userService, codeService, jwtHandler)
 	chatModel := ioc.InitChatModel()
-	parseGraph, err := resumeservice.NewParseGraph(logger, chatModel)
+	parseWorkflow, err := resumeservice.NewParseWorkflow(logger, chatModel)
 	if err != nil {
 		panic(err)
 	}
-	scoringAgent := resumeservice.NewScoringAgent(logger, chatModel)
+	scoringWorkflow, err := resumeservice.NewScoringWorkflow(logger, chatModel)
+	if err != nil {
+		panic(err)
+	}
 	resumeDAO := resumedao.NewGORMResumeDAO(db)
 	resumeRepository := resumerepo.NewCachedResumeRepository(resumeDAO, logger)
-	resumeService := resumeservice.NewResumeService(logger, resumeRepository, parseGraph, scoringAgent)
+	resumeService := resumeservice.NewResumeService(logger, resumeRepository, parseWorkflow, scoringWorkflow)
 	resumeHandler := resumehandler.NewResumeHandler(logger, resumeService)
 	engine := ioc.InitWebEngine(v, logger, userHandler, resumeHandler)
 	app := &App{
@@ -62,4 +65,4 @@ var userSvc = wire.NewSet(cache.NewRedisUserCache, dao.NewGORMUserDAO, repositor
 
 var codeSvc = wire.NewSet(cache2.NewRedisCodeCache, repository2.NewCachedCodeRepository, ioc.InitSMSService, service2.NewCodeService)
 
-var resumeSvc = wire.NewSet(resumedao.NewGORMResumeDAO, resumerepo.NewCachedResumeRepository, ioc.InitChatModel, resumeservice.NewParseGraph, resumeservice.NewScoringAgent, resumeservice.NewResumeService, resumehandler.NewResumeHandler)
+var resumeSvc = wire.NewSet(resumedao.NewGORMResumeDAO, resumerepo.NewCachedResumeRepository, ioc.InitChatModel, resumeservice.NewParseWorkflow, resumeservice.NewScoringWorkflow, resumeservice.NewResumeService, resumehandler.NewResumeHandler)

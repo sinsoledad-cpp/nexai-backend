@@ -14,7 +14,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-type ParseGraph struct {
+type ParseWorkflow struct {
 	l         logger.Logger
 	chatModel model.BaseChatModel
 	runnable  compose.Runnable[*parseInput, *domain.ParsedResume]
@@ -28,106 +28,65 @@ type cleanedText struct {
 	Content string
 }
 
-type moduleSegments struct {
-	PersonalInfo string
-	Education    string
-	Work         string
-	Projects     string
-	Skills       string
-}
-
-func NewParseGraph(l logger.Logger, chatModel model.BaseChatModel) (*ParseGraph, error) {
-	pg := &ParseGraph{
+func NewParseWorkflow(l logger.Logger, chatModel model.BaseChatModel) (*ParseWorkflow, error) {
+	pw := &ParseWorkflow{
 		l:         l,
 		chatModel: chatModel,
 	}
 
-	graph := compose.NewGraph[*parseInput, *domain.ParsedResume]()
+	wf := compose.NewWorkflow[*parseInput, *domain.ParsedResume]()
 
-	err := graph.AddLambdaNode("text_clean", compose.InvokableLambda(pg.textCleanNode))
-	if err != nil {
-		return nil, fmt.Errorf("添加文本清洗节点失败: %w", err)
-	}
+	wf.AddLambdaNode("text_clean", compose.InvokableLambda(pw.textCleanNode)).
+		AddInput(compose.START, compose.FromField("RawText"))
+	wf.AddLambdaNode("llm_extract", compose.InvokableLambda(pw.llmExtractNode)).
+		AddInput("text_clean")
+	wf.AddLambdaNode("schema_validate", compose.InvokableLambda(pw.schemaValidateNode)).
+		AddInput("llm_extract")
+	wf.End().AddInput("schema_validate")
 
-	err = graph.AddLambdaNode("module_split", compose.InvokableLambda(pg.moduleSplitNode))
+	runnable, err := wf.Compile(context.Background())
 	if err != nil {
-		return nil, fmt.Errorf("添加模块切分节点失败: %w", err)
-	}
-
-	err = graph.AddLambdaNode("llm_extract", compose.InvokableLambda(pg.llmExtractNode))
-	if err != nil {
-		return nil, fmt.Errorf("添加LLM提取节点失败: %w", err)
+		return nil, fmt.Errorf("编译解析工作流失败: %w", err)
 	}
 
-	err = graph.AddLambdaNode("schema_validate", compose.InvokableLambda(pg.schemaValidateNode))
-	if err != nil {
-		return nil, fmt.Errorf("添加Schema校验节点失败: %w", err)
-	}
-
-	err = graph.AddEdge(compose.START, "text_clean")
-	if err != nil {
-		return nil, err
-	}
-	err = graph.AddEdge("text_clean", "module_split")
-	if err != nil {
-		return nil, err
-	}
-	err = graph.AddEdge("module_split", "llm_extract")
-	if err != nil {
-		return nil, err
-	}
-	err = graph.AddEdge("llm_extract", "schema_validate")
-	if err != nil {
-		return nil, err
-	}
-	err = graph.AddEdge("schema_validate", compose.END)
-	if err != nil {
-		return nil, err
-	}
-
-	runnable, err := graph.Compile(context.Background())
-	if err != nil {
-		return nil, fmt.Errorf("编译解析图失败: %w", err)
-	}
-
-	pg.runnable = runnable
-	return pg, nil
+	pw.runnable = runnable
+	return pw, nil
 }
 
-func (pg *ParseGraph) Run(ctx context.Context, rawText string) (domain.ParsedResume, error) {
-	result, err := pg.runnable.Invoke(ctx, &parseInput{RawText: rawText})
+func (pw *ParseWorkflow) Run(ctx context.Context, rawText string) (domain.ParsedResume, error) {
+	result, err := pw.runnable.Invoke(ctx, &parseInput{RawText: rawText})
 	if err != nil {
-		return domain.ParsedResume{}, fmt.Errorf("解析图执行失败: %w", err)
+		return domain.ParsedResume{}, fmt.Errorf("解析工作流执行失败: %w", err)
 	}
 	return *result, nil
 }
 
-func (pg *ParseGraph) ExtractText(ctx context.Context, fileType string, data []byte) (string, error) {
+func (pw *ParseWorkflow) ExtractText(ctx context.Context, fileType string, data []byte) (string, error) {
 	switch fileType {
 	case ".pdf":
-		return pg.extractFromPDF(data)
+		return pw.extractFromPDF(data)
 	case ".docx", ".doc":
-		return pg.extractFromDocx(data)
+		return pw.extractFromDocx(data)
 	case ".png", ".jpg", ".jpeg":
-		return pg.extractFromImage(data)
+		return pw.extractFromImage(data)
 	default:
 		return "", ErrFileTypeUnsupported
 	}
 }
 
-func (pg *ParseGraph) extractFromPDF(data []byte) (string, error) {
+func (pw *ParseWorkflow) extractFromPDF(data []byte) (string, error) {
 	return string(data), nil
 }
 
-func (pg *ParseGraph) extractFromDocx(data []byte) (string, error) {
+func (pw *ParseWorkflow) extractFromDocx(data []byte) (string, error) {
 	return string(data), nil
 }
 
-func (pg *ParseGraph) extractFromImage(data []byte) (string, error) {
+func (pw *ParseWorkflow) extractFromImage(data []byte) (string, error) {
 	return string(data), nil
 }
 
-func (pg *ParseGraph) textCleanNode(ctx context.Context, input *parseInput) (*cleanedText, error) {
+func (pw *ParseWorkflow) textCleanNode(ctx context.Context, input *parseInput) (*cleanedText, error) {
 	text := input.RawText
 
 	text = strings.ReplaceAll(text, "\r\n", "\n")
@@ -141,73 +100,12 @@ func (pg *ParseGraph) textCleanNode(ctx context.Context, input *parseInput) (*cl
 
 	text = strings.TrimSpace(text)
 
-	pg.l.Debug("文本清洗完成", logger.Field{Key: "length", Val: len(text)})
+	pw.l.Debug("文本清洗完成", logger.Field{Key: "length", Val: len(text)})
 
 	return &cleanedText{Content: text}, nil
 }
 
-func (pg *ParseGraph) moduleSplitNode(ctx context.Context, input *cleanedText) (*moduleSegments, error) {
-	segments := &moduleSegments{}
-	text := input.Content
-
-	sections := map[string]*string{
-		"个人信息": &segments.PersonalInfo,
-		"教育背景": &segments.Education,
-		"工作经历": &segments.Work,
-		"项目经验": &segments.Projects,
-		"技能":   &segments.Skills,
-	}
-
-	sectionKeywords := map[string][]string{
-		"个人信息": {"个人信息", "基本信息", "联系方式", "个人资料"},
-		"教育背景": {"教育背景", "教育经历", "学历", "学术背景"},
-		"工作经历": {"工作经历", "工作经验", "工作背景", "职业经历"},
-		"项目经验": {"项目经验", "项目经历", "项目"},
-		"技能":   {"技能", "专业技能", "技术栈", "核心技能"},
-	}
-
-	lines := strings.Split(text, "\n")
-	currentSection := "个人信息"
-	var sectionLines []string
-
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			sectionLines = append(sectionLines, line)
-			continue
-		}
-
-		found := false
-		for section, keywords := range sectionKeywords {
-			for _, kw := range keywords {
-				if strings.Contains(line, kw) && len(line) < 20 {
-					if ptr, ok := sections[currentSection]; ok && len(sectionLines) > 0 {
-						*ptr = strings.Join(sectionLines, "\n")
-					}
-					currentSection = section
-					sectionLines = nil
-					found = true
-					break
-				}
-			}
-			if found {
-				break
-			}
-		}
-
-		if !found {
-			sectionLines = append(sectionLines, line)
-		}
-	}
-
-	if ptr, ok := sections[currentSection]; ok {
-		*ptr = strings.Join(sectionLines, "\n")
-	}
-
-	return segments, nil
-}
-
-func (pg *ParseGraph) llmExtractNode(ctx context.Context, input *moduleSegments) (*domain.ParsedResume, error) {
+func (pw *ParseWorkflow) llmExtractNode(ctx context.Context, input *cleanedText) (*domain.ParsedResume, error) {
 	toolInfo := &schema.ToolInfo{
 		Name: "extract_resume_info",
 		Desc: "从简历文本中提取结构化信息",
@@ -235,17 +133,17 @@ func (pg *ParseGraph) llmExtractNode(ctx context.Context, input *moduleSegments)
 			"education": {
 				Type:     schema.Array,
 				ElemInfo: &schema.ParameterInfo{Type: schema.Object},
-				Desc:     "教育背景列表",
+				Desc:     "教育背景列表，每项包含school(学校)、degree(学位)、major(专业)、start_date(开始时间)、end_date(结束时间)",
 			},
 			"work_experience": {
 				Type:     schema.Array,
 				ElemInfo: &schema.ParameterInfo{Type: schema.Object},
-				Desc:     "工作经历列表",
+				Desc:     "工作经历列表，每项包含company(公司)、position(职位)、start_date(开始时间)、end_date(结束时间)、description(工作描述)",
 			},
 			"projects": {
 				Type:     schema.Array,
 				ElemInfo: &schema.ParameterInfo{Type: schema.Object},
-				Desc:     "项目经验列表",
+				Desc:     "项目经验列表，每项包含name(项目名)、role(角色)、start_date(开始时间)、end_date(结束时间)、description(项目描述)",
 			},
 			"skills": {
 				Type:     schema.Array,
@@ -255,47 +153,35 @@ func (pg *ParseGraph) llmExtractNode(ctx context.Context, input *moduleSegments)
 		}),
 	}
 
-	prompt := fmt.Sprintf(`请从以下简历文本中提取结构化信息。
+	systemPrompt := `你是一个专业的简历信息提取专家，能够从任何行业、任何格式的简历中精准提取结构化信息。
 
-个人信息部分：
-%s
-
-教育背景部分：
-%s
-
-工作经历部分：
-%s
-
-项目经验部分：
-%s
-
-技能部分：
-%s
-
-请调用 extract_resume_info 函数返回提取结果。`, input.PersonalInfo, input.Education, input.Work, input.Projects, input.Skills)
-
-	messages := []*schema.Message{
-		{
-			Role: schema.System,
-			Content: `你是一个专业的简历信息提取专家。你需要从简历文本中精准提取以下信息：
-1. 个人信息：姓名、电话、邮箱、地址、个人简介
+你的任务是从简历文本中提取以下信息：
+1. 个人信息：姓名、电话、邮箱、地址、个人简介/优势
 2. 教育背景：学校、学位、专业、起止时间
 3. 工作经历：公司、职位、起止时间、工作描述
 4. 项目经验：项目名、角色、起止时间、项目描述
 5. 技能栈：所有技能关键词
 
-你必须调用 extract_resume_info 函数来返回提取结果。确保提取的信息准确、完整。`,
-		},
-		{
-			Role:    schema.User,
-			Content: prompt,
-		},
+注意事项：
+- 你需要处理各种行业的简历，包括但不限于IT、金融、医疗、教育、法律、制造业等
+- 不同行业的简历可能有不同的模块命名和结构，请灵活识别
+- 工作描述和项目描述应保留原文的关键信息，不要遗漏
+- 如果某个字段在简历中确实不存在，请留空字符串或空数组
+- 你必须调用 extract_resume_info 函数来返回提取结果`
+
+	userPrompt := fmt.Sprintf(`请从以下简历文本中提取结构化信息，调用 extract_resume_info 函数返回结果：
+
+%s`, input.Content)
+
+	messages := []*schema.Message{
+		{Role: schema.System, Content: systemPrompt},
+		{Role: schema.User, Content: userPrompt},
 	}
 
-	resp, err := pg.chatModel.Generate(ctx, messages, model.WithTools([]*schema.ToolInfo{toolInfo}))
+	resp, err := pw.chatModel.Generate(ctx, messages, model.WithTools([]*schema.ToolInfo{toolInfo}))
 	if err != nil {
-		pg.l.Error("LLM调用失败", logger.Error(err))
-		return pg.fallbackExtract(input), nil
+		pw.l.Error("LLM调用失败", logger.Error(err))
+		return pw.fallbackExtract(input), nil
 	}
 
 	for _, toolCall := range resp.ToolCalls {
@@ -330,8 +216,8 @@ func (pg *ParseGraph) llmExtractNode(ctx context.Context, input *moduleSegments)
 				Skills []string `json:"skills"`
 			}
 			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &result); err != nil {
-				pg.l.Error("解析LLM返回结果失败", logger.Error(err))
-				return pg.fallbackExtract(input), nil
+				pw.l.Error("解析LLM返回结果失败", logger.Error(err))
+				return pw.fallbackExtract(input), nil
 			}
 
 			parsed := &domain.ParsedResume{
@@ -380,13 +266,13 @@ func (pg *ParseGraph) llmExtractNode(ctx context.Context, input *moduleSegments)
 	}
 
 	if resp.Content != "" {
-		return pg.parseFromContent(resp.Content), nil
+		return pw.parseFromContent(resp.Content), nil
 	}
 
-	return pg.fallbackExtract(input), nil
+	return pw.fallbackExtract(input), nil
 }
 
-func (pg *ParseGraph) schemaValidateNode(ctx context.Context, input *domain.ParsedResume) (*domain.ParsedResume, error) {
+func (pw *ParseWorkflow) schemaValidateNode(ctx context.Context, input *domain.ParsedResume) (*domain.ParsedResume, error) {
 	if input.PersonalInfo.Name == "" {
 		input.PersonalInfo.Name = "未知"
 	}
@@ -405,14 +291,11 @@ func (pg *ParseGraph) schemaValidateNode(ctx context.Context, input *domain.Pars
 	return input, nil
 }
 
-func (pg *ParseGraph) fallbackExtract(input *moduleSegments) *domain.ParsedResume {
+func (pw *ParseWorkflow) fallbackExtract(input *cleanedText) *domain.ParsedResume {
 	result := &domain.ParsedResume{
 		PersonalInfo: domain.PersonalInfo{
 			Name:    "未知",
-			Phone:   "",
-			Email:   "",
-			Address: "",
-			Summary: input.PersonalInfo,
+			Summary: input.Content,
 		},
 		Education:      []domain.Education{},
 		WorkExperience: []domain.WorkExperience{},
@@ -422,7 +305,7 @@ func (pg *ParseGraph) fallbackExtract(input *moduleSegments) *domain.ParsedResum
 	return result
 }
 
-func (pg *ParseGraph) parseFromContent(content string) *domain.ParsedResume {
+func (pw *ParseWorkflow) parseFromContent(content string) *domain.ParsedResume {
 	result := &domain.ParsedResume{
 		PersonalInfo: domain.PersonalInfo{
 			Name:    "未知",

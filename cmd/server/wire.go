@@ -45,8 +45,8 @@ var resumeSvc = wire.NewSet(
 	resumedao.NewGORMResumeDAO,
 	resumerepo.NewCachedResumeRepository,
 	ioc2.InitChatModel,
-	resumeservice.NewParseGraph,
-	resumeservice.NewScoringAgent,
+	resumeservice.NewParseWorkflow,
+	resumeservice.NewScoringWorkflow,
 	resumeservice.NewResumeService,
 	resumehandler.NewResumeHandler,
 )

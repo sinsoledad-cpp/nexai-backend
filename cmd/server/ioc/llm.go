@@ -10,11 +10,16 @@ import (
 
 func InitChatModel() model.BaseChatModel {
 	cfg := service.LLMConfig{
-		BaseURL: viper.GetString("llm.baseURL"),
-		APIKey:  viper.GetString("llm.apiKey"),
-		Model:   viper.GetString("llm.model"),
+		Provider: viper.GetString("llm.provider"),
+		BaseURL:  viper.GetString("llm.baseURL"),
+		APIKey:   viper.GetString("llm.apiKey"),
+		Model:    viper.GetString("llm.model"),
+		Region:   viper.GetString("llm.region"),
 	}
 
+	if cfg.Provider == "" {
+		cfg.Provider = os.Getenv("LLM_PROVIDER")
+	}
 	if cfg.BaseURL == "" {
 		cfg.BaseURL = os.Getenv("LLM_BASE_URL")
 	}
@@ -24,12 +29,21 @@ func InitChatModel() model.BaseChatModel {
 	if cfg.Model == "" {
 		cfg.Model = os.Getenv("LLM_MODEL")
 	}
-
-	if cfg.BaseURL == "" {
-		cfg.BaseURL = "https://api.openai.com/v1"
+	if cfg.Region == "" {
+		cfg.Region = os.Getenv("LLM_REGION")
 	}
-	if cfg.Model == "" {
-		cfg.Model = "gpt-4o-mini"
+
+	if cfg.Provider == "ark" {
+		if cfg.Region == "" {
+			cfg.Region = "cn-beijing"
+		}
+	} else {
+		if cfg.BaseURL == "" {
+			cfg.BaseURL = "https://api.openai.com/v1"
+		}
+		if cfg.Model == "" {
+			cfg.Model = "gpt-4o-mini"
+		}
 	}
 
 	m, err := service.NewChatModel(cfg)
