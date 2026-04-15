@@ -10,27 +10,11 @@ import (
 
 func InitChatModel() model.BaseChatModel {
 	cfg := service.LLMConfig{
-		Provider: viper.GetString("llm.provider"),
-		BaseURL:  viper.GetString("llm.baseURL"),
-		APIKey:   viper.GetString("llm.apiKey"),
-		Model:    viper.GetString("llm.model"),
-		Region:   viper.GetString("llm.region"),
-	}
-
-	if cfg.Provider == "" {
-		cfg.Provider = os.Getenv("LLM_PROVIDER")
-	}
-	if cfg.BaseURL == "" {
-		cfg.BaseURL = os.Getenv("LLM_BASE_URL")
-	}
-	if cfg.APIKey == "" {
-		cfg.APIKey = os.Getenv("LLM_API_KEY")
-	}
-	if cfg.Model == "" {
-		cfg.Model = os.Getenv("LLM_MODEL")
-	}
-	if cfg.Region == "" {
-		cfg.Region = os.Getenv("LLM_REGION")
+		Provider: envOrViper("LLM_PROVIDER", "llm.provider"),
+		BaseURL:  envOrViper("LLM_BASE_URL", "llm.baseURL"),
+		APIKey:   envOrViper("LLM_API_KEY", "llm.apiKey"),
+		Model:    envOrViper("LLM_MODEL", "llm.model"),
+		Region:   envOrViper("LLM_REGION", "llm.region"),
 	}
 
 	if cfg.Provider == "ark" {
@@ -46,9 +30,18 @@ func InitChatModel() model.BaseChatModel {
 		}
 	}
 
+	//fmt.Printf("cfg:= #v", cfg)
+
 	m, err := service.NewChatModel(cfg)
 	if err != nil {
 		panic(err)
 	}
 	return m
+}
+
+func envOrViper(envKey, viperKey string) string {
+	if val := os.Getenv(envKey); val != "" {
+		return val
+	}
+	return viper.GetString(viperKey)
 }

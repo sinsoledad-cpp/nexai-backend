@@ -17,6 +17,7 @@ import (
 type ParseWorkflow struct {
 	l         logger.Logger
 	chatModel model.BaseChatModel
+	extractor *TextExtractor
 	runnable  compose.Runnable[*parseInput, *domain.ParsedResume]
 }
 
@@ -32,12 +33,13 @@ func NewParseWorkflow(l logger.Logger, chatModel model.BaseChatModel) (*ParseWor
 	pw := &ParseWorkflow{
 		l:         l,
 		chatModel: chatModel,
+		extractor: NewTextExtractor(),
 	}
 
 	wf := compose.NewWorkflow[*parseInput, *domain.ParsedResume]()
 
 	wf.AddLambdaNode("text_clean", compose.InvokableLambda(pw.textCleanNode)).
-		AddInput(compose.START, compose.FromField("RawText"))
+		AddInput(compose.START)
 	wf.AddLambdaNode("llm_extract", compose.InvokableLambda(pw.llmExtractNode)).
 		AddInput("text_clean")
 	wf.AddLambdaNode("schema_validate", compose.InvokableLambda(pw.schemaValidateNode)).
@@ -62,28 +64,7 @@ func (pw *ParseWorkflow) Run(ctx context.Context, rawText string) (domain.Parsed
 }
 
 func (pw *ParseWorkflow) ExtractText(ctx context.Context, fileType string, data []byte) (string, error) {
-	switch fileType {
-	case ".pdf":
-		return pw.extractFromPDF(data)
-	case ".docx", ".doc":
-		return pw.extractFromDocx(data)
-	case ".png", ".jpg", ".jpeg":
-		return pw.extractFromImage(data)
-	default:
-		return "", ErrFileTypeUnsupported
-	}
-}
-
-func (pw *ParseWorkflow) extractFromPDF(data []byte) (string, error) {
-	return string(data), nil
-}
-
-func (pw *ParseWorkflow) extractFromDocx(data []byte) (string, error) {
-	return string(data), nil
-}
-
-func (pw *ParseWorkflow) extractFromImage(data []byte) (string, error) {
-	return string(data), nil
+	return pw.extractor.Extract(fileType, data)
 }
 
 func (pw *ParseWorkflow) textCleanNode(ctx context.Context, input *parseInput) (*cleanedText, error) {

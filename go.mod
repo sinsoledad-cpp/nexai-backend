@@ -7,6 +7,7 @@ require (
 	github.com/IBM/sarama v1.47.0
 	github.com/aliyun/alibaba-cloud-sdk-go v1.63.107
 	github.com/cloudwego/eino v0.8.9
+	github.com/cloudwego/eino-ext/components/model/ark v0.1.66
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.12
 	github.com/dlclark/regexp2 v1.11.5
 	github.com/ecodeclub/ekit v0.0.10
@@ -20,7 +21,9 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/google/wire v0.7.0
+	github.com/joho/godotenv v1.5.1
 	github.com/json-iterator/go v1.1.12
+	github.com/ledongthuc/pdf v0.0.0-20250511090121-5959a4027728
 	github.com/mojocn/base64Captcha v1.3.8
 	github.com/natefinch/lumberjack v2.0.0+incompatible
 	github.com/prometheus/client_golang v1.23.2
@@ -58,7 +61,6 @@ require (
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.6 // indirect
-	github.com/cloudwego/eino-ext/components/model/ark v0.1.66 // indirect
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.16 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect

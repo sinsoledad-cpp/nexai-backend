@@ -7,7 +7,6 @@ import (
 	"github.com/cloudwego/eino-ext/components/model/ark"
 	"github.com/cloudwego/eino-ext/components/model/openai"
 	"github.com/cloudwego/eino/components/model"
-	"github.com/cloudwego/eino/schema"
 )
 
 type LLMConfig struct {
@@ -52,16 +51,4 @@ func newOpenAIChatModel(cfg LLMConfig) (model.BaseChatModel, error) {
 		return nil, fmt.Errorf("创建OpenAI ChatModel失败: %w", err)
 	}
 	return m, nil
-}
-
-type ChatModelAdapter struct {
-	model model.BaseChatModel
-}
-
-func NewChatModelAdapter(m model.BaseChatModel) *ChatModelAdapter {
-	return &ChatModelAdapter{model: m}
-}
-
-func (a *ChatModelAdapter) Generate(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.Message, error) {
-	return a.model.Generate(ctx, input, opts...)
 }

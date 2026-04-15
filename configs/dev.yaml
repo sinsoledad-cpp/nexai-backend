@@ -23,6 +23,4 @@ kafka:
 
 llm:
   provider: "ark"
-  apiKey: ""
-  model: ""
   region: "cn-beijing"
