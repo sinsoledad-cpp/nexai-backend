@@ -1,6 +1,7 @@
 package ioc
 
 import (
+	resumedao "nexai-backend/internal/resume/repository/dao"
 	"nexai-backend/internal/user/repository/dao"
 
 	"gorm.io/gorm"
@@ -9,6 +10,6 @@ import (
 func InitDatabase(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&dao.User{},
-		// 其他模块的表结构体可以在这里添加
+		&resumedao.Resume{},
 	)
 }

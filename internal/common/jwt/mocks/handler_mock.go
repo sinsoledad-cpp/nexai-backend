@@ -10,6 +10,7 @@
 package mocks
 
 import (
+	jwt "nexai-backend/internal/common/jwt"
 	reflect "reflect"
 
 	gin "github.com/gin-gonic/gin"
@@ -83,11 +84,12 @@ func (mr *MockHandlerMockRecorder) ExtractTokenString(ctx any) *gomock.Call {
 }
 
 // SetJWTToken mocks base method.
-func (m *MockHandler) SetJWTToken(ctx *gin.Context, uid int64, ssid string) error {
+func (m *MockHandler) SetJWTToken(ctx *gin.Context, uid int64, ssid string) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetJWTToken", ctx, uid, ssid)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // SetJWTToken indicates an expected call of SetJWTToken.
@@ -97,11 +99,12 @@ func (mr *MockHandlerMockRecorder) SetJWTToken(ctx, uid, ssid any) *gomock.Call 
 }
 
 // SetLoginToken mocks base method.
-func (m *MockHandler) SetLoginToken(ctx *gin.Context, uid int64) error {
+func (m *MockHandler) SetLoginToken(ctx *gin.Context, uid int64) (jwt.TokenPair, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetLoginToken", ctx, uid)
-	ret0, _ := ret[0].(error)
-	return ret0
+	ret0, _ := ret[0].(jwt.TokenPair)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
 }
 
 // SetLoginToken indicates an expected call of SetLoginToken.
