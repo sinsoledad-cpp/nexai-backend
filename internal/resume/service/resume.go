@@ -11,33 +11,38 @@ import (
 	"strings"
 )
 
+// 错误定义
 var (
-	ErrResumeNotFound      = repository.ErrResumeNotFound
-	ErrFileTypeUnsupported = fmt.Errorf("不支持的文件类型")
-	ErrFileTooLarge        = fmt.Errorf("文件大小超出限制")
-	ErrParseFailed         = fmt.Errorf("简历解析失败")
-	ErrNotParsed           = fmt.Errorf("简历尚未解析")
+	ErrResumeNotFound      = repository.ErrResumeNotFound // 简历不存在
+	ErrFileTypeUnsupported = fmt.Errorf("不支持的文件类型")       // 不支持的文件类型
+	ErrFileTooLarge        = fmt.Errorf("文件大小超出限制")       // 文件大小超出限制
+	ErrParseFailed         = fmt.Errorf("简历解析失败")         // 简历解析失败
+	ErrNotParsed           = fmt.Errorf("简历尚未解析")         // 简历尚未解析
 )
 
+// 最大文件大小：10MB
 const maxFileSize = 10 << 20
 
+// ResumeService 简历服务接口
 type ResumeService interface {
-	Upload(ctx context.Context, uid int64, fileName string, fileData []byte) (domain.Resume, error)
-	Parse(ctx context.Context, uid int64, fileID int64) (domain.ParsedResume, error)
-	Correct(ctx context.Context, uid int64, fileID int64, parsed domain.ParsedResume) (domain.ParsedResume, error)
-	Score(ctx context.Context, uid int64, fileID int64, targetPosition string) (domain.ScoreResult, error)
-	Optimize(ctx context.Context, uid int64, fileID int64, targetPosition string, jd string) (domain.OptimizationResult, error)
-	FindById(ctx context.Context, id int64) (domain.Resume, error)
+	Upload(ctx context.Context, uid int64, fileName string, fileData []byte) (domain.Resume, error)                             // 上传简历
+	Parse(ctx context.Context, uid int64, fileID int64) (domain.ParsedResume, error)                                            // 解析简历
+	Correct(ctx context.Context, uid int64, fileID int64, parsed domain.ParsedResume) (domain.ParsedResume, error)              // 修正简历
+	Score(ctx context.Context, uid int64, fileID int64, targetPosition string) (domain.ScoreResult, error)                      // 评分简历
+	Optimize(ctx context.Context, uid int64, fileID int64, targetPosition string, jd string) (domain.OptimizationResult, error) // 优化建议
+	FindById(ctx context.Context, id int64) (domain.Resume, error)                                                              // 根据ID查找简历
 }
 
+// DefaultResumeService 简历服务默认实现
 type DefaultResumeService struct {
-	l         logger.Logger
-	repo      repository.ResumeRepository
-	parser    *ParseWorkflow
-	scorer    *ScoringWorkflow
-	optimizer *OptimizationWorkflow
+	l         logger.Logger               // 日志器
+	repo      repository.ResumeRepository // 简历仓库
+	parser    *ParseWorkflow              // 解析工作流
+	scorer    *ScoringWorkflow            // 评分工作流
+	optimizer *OptimizationWorkflow       // 优化工作流
 }
 
+// NewResumeService 创建简历服务实例
 func NewResumeService(l logger.Logger, repo repository.ResumeRepository, parser *ParseWorkflow, scorer *ScoringWorkflow, optimizer *OptimizationWorkflow) ResumeService {
 	return &DefaultResumeService{
 		l:         l,
@@ -48,6 +53,7 @@ func NewResumeService(l logger.Logger, repo repository.ResumeRepository, parser 
 	}
 }
 
+// Upload 处理简历上传：验证文件类型和大小，提取文本内容
 func (svc *DefaultResumeService) Upload(ctx context.Context, uid int64, fileName string, fileData []byte) (domain.Resume, error) {
 	ext := strings.ToLower(filepath.Ext(fileName))
 	if ext != ".pdf" && ext != ".docx" && ext != ".doc" && ext != ".png" && ext != ".jpg" && ext != ".jpeg" {
@@ -90,6 +96,7 @@ func (svc *DefaultResumeService) Upload(ctx context.Context, uid int64, fileName
 	return r, nil
 }
 
+// Parse 解析简历：提取结构化信息
 func (svc *DefaultResumeService) Parse(ctx context.Context, uid int64, fileID int64) (domain.ParsedResume, error) {
 	resume, err := svc.repo.FindById(ctx, fileID)
 	if err != nil {
@@ -118,6 +125,7 @@ func (svc *DefaultResumeService) Parse(ctx context.Context, uid int64, fileID in
 	return parsed, nil
 }
 
+// Correct 修正简历：更新解析后的数据
 func (svc *DefaultResumeService) Correct(ctx context.Context, uid int64, fileID int64, parsed domain.ParsedResume) (domain.ParsedResume, error) {
 	_, err := svc.repo.FindById(ctx, fileID)
 	if err != nil {
@@ -132,6 +140,7 @@ func (svc *DefaultResumeService) Correct(ctx context.Context, uid int64, fileID 
 	return parsed, nil
 }
 
+// Score 评分简历：基于目标岗位进行多维度评分
 func (svc *DefaultResumeService) Score(ctx context.Context, uid int64, fileID int64, targetPosition string) (domain.ScoreResult, error) {
 	resume, err := svc.repo.FindById(ctx, fileID)
 	if err != nil {
@@ -161,10 +170,12 @@ func (svc *DefaultResumeService) Score(ctx context.Context, uid int64, fileID in
 	return result, nil
 }
 
+// FindById 根据ID查找简历
 func (svc *DefaultResumeService) FindById(ctx context.Context, id int64) (domain.Resume, error) {
 	return svc.repo.FindById(ctx, id)
 }
 
+// Optimize 优化建议：基于目标岗位和JD提供优化分析
 func (svc *DefaultResumeService) Optimize(ctx context.Context, uid int64, fileID int64, targetPosition string, jd string) (domain.OptimizationResult, error) {
 	resume, err := svc.repo.FindById(ctx, fileID)
 	if err != nil {

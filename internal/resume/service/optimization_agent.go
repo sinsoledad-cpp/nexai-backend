@@ -13,52 +13,60 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
+// OptimizationWorkflow 简历优化工作流，基于LLM实现缺陷诊断、STAR改写和JD匹配分析
 type OptimizationWorkflow struct {
-	l         logger.Logger
-	chatModel model.BaseChatModel
-	runnable  compose.Runnable[*optimizationInput, *domain.OptimizationResult]
+	l         logger.Logger                                                    // 日志器
+	chatModel model.BaseChatModel                                              // 聊天模型
+	runnable  compose.Runnable[*optimizationInput, *domain.OptimizationResult] // 可运行的工作流
 }
 
+// optimizationInput 优化工作流的输入参数
 type optimizationInput struct {
-	ParsedResume   string
-	TargetPosition string
-	JD             string
+	ParsedResume   string // 解析后的简历JSON数据
+	TargetPosition string // 目标岗位
+	JD             string // 职位描述（选填）
 }
 
+// llmOptimizationOutput LLM优化输出的结构
 type llmOptimizationOutput struct {
-	Diagnoses    []diagnosisItem   `json:"diagnoses"`
-	StarRewrites []starRewriteItem `json:"starRewrites"`
-	JdMatch      jdMatchOutput     `json:"jdMatch"`
+	Diagnoses    []diagnosisItem   `json:"diagnoses"`    // 缺陷诊断列表
+	StarRewrites []starRewriteItem `json:"starRewrites"` // STAR改写列表
+	JdMatch      jdMatchOutput     `json:"jdMatch"`      // JD匹配结果
 }
 
+// diagnosisItem 缺陷诊断项
 type diagnosisItem struct {
-	Target     string `json:"target"`
-	Issue      string `json:"issue"`
-	Severity   string `json:"severity"`
-	Suggestion string `json:"suggestion"`
-	Type       string `json:"type"`
+	Target     string `json:"target"`     // 问题所在模块
+	Issue      string `json:"issue"`      // 问题描述
+	Severity   string `json:"severity"`   // 严重程度
+	Suggestion string `json:"suggestion"` // 修改建议
+	Type       string `json:"type"`       // 建议类型
 }
 
+// starRewriteItem STAR改写项
 type starRewriteItem struct {
-	Original  string `json:"original"`
-	Rewritten string `json:"rewritten"`
-	Section   string `json:"section"`
+	Original  string `json:"original"`  // 原始内容
+	Rewritten string `json:"rewritten"` // 改写后内容
+	Section   string `json:"section"`   // 所属模块
 }
 
+// jdMatchOutput JD匹配输出
 type jdMatchOutput struct {
-	MatchScore    int                 `json:"matchScore"`
-	MatchedSkills []string            `json:"matchedSkills"`
-	MissingSkills []string            `json:"missingSkills"`
-	GapAnalysis   []gapSuggestionItem `json:"gapAnalysis"`
+	MatchScore    int                 `json:"matchScore"`    // 匹配分数
+	MatchedSkills []string            `json:"matchedSkills"` // 已匹配技能
+	MissingSkills []string            `json:"missingSkills"` // 缺失技能
+	GapAnalysis   []gapSuggestionItem `json:"gapAnalysis"`   // 差距分析
 }
 
+// gapSuggestionItem 技能差距建议项
 type gapSuggestionItem struct {
-	Skill      string `json:"skill"`
-	Importance string `json:"importance"`
-	Suggestion string `json:"suggestion"`
-	Type       string `json:"type"`
+	Skill      string `json:"skill"`      // 技能名称
+	Importance string `json:"importance"` // 重要程度
+	Suggestion string `json:"suggestion"` // 建议内容
+	Type       string `json:"type"`       // 建议类型
 }
 
+// NewOptimizationWorkflow 创建优化工作流实例
 func NewOptimizationWorkflow(l logger.Logger, chatModel model.BaseChatModel) (*OptimizationWorkflow, error) {
 	ow := &OptimizationWorkflow{
 		l:         l,
@@ -82,6 +90,7 @@ func NewOptimizationWorkflow(l logger.Logger, chatModel model.BaseChatModel) (*O
 	return ow, nil
 }
 
+// Evaluate 执行优化分析
 func (ow *OptimizationWorkflow) Evaluate(ctx context.Context, parsedData string, targetPosition string, jd string) (domain.OptimizationResult, error) {
 	result, err := ow.runnable.Invoke(ctx, &optimizationInput{
 		ParsedResume:   parsedData,
@@ -94,6 +103,7 @@ func (ow *OptimizationWorkflow) Evaluate(ctx context.Context, parsedData string,
 	return *result, nil
 }
 
+// llmOptimizeNode LLM优化节点，调用LLM进行缺陷诊断、STAR改写和JD匹配分析
 func (ow *OptimizationWorkflow) llmOptimizeNode(ctx context.Context, input *optimizationInput) (*llmOptimizationOutput, error) {
 	toolInfo := &schema.ToolInfo{
 		Name: "optimize_resume",
@@ -212,6 +222,7 @@ func (ow *OptimizationWorkflow) llmOptimizeNode(ctx context.Context, input *opti
 	return ow.fallbackOptimization(), nil
 }
 
+// normalizeNode 规范化节点，将LLM输出转换为领域模型
 func (ow *OptimizationWorkflow) normalizeNode(ctx context.Context, input *llmOptimizationOutput) (*domain.OptimizationResult, error) {
 	diagnoses := make([]domain.Diagnosis, 0, len(input.Diagnoses))
 	for _, d := range input.Diagnoses {
@@ -292,6 +303,7 @@ func (ow *OptimizationWorkflow) normalizeNode(ctx context.Context, input *llmOpt
 	}, nil
 }
 
+// fallbackOptimization 返回降级优化结果
 func (ow *OptimizationWorkflow) fallbackOptimization() *llmOptimizationOutput {
 	return &llmOptimizationOutput{
 		Diagnoses: []diagnosisItem{
@@ -313,6 +325,7 @@ func (ow *OptimizationWorkflow) fallbackOptimization() *llmOptimizationOutput {
 	}
 }
 
+// parseOptimizationFromContent 从LLM返回的文本内容中解析优化结果
 func (ow *OptimizationWorkflow) parseOptimizationFromContent(content string) *llmOptimizationOutput {
 	result := ow.fallbackOptimization()
 	if strings.Contains(content, "{") {

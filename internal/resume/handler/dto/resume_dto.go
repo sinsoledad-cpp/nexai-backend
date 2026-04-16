@@ -94,48 +94,48 @@ type DimensionScoreDTO struct {
 
 // OptimizeRequest 优化建议请求
 type OptimizeRequest struct {
-	FileID         int64  `json:"fileId" binding:"required"`
-	TargetPosition string `json:"targetPosition" binding:"required"`
-	JD             string `json:"jd"`
+	FileID         int64  `json:"fileId" binding:"required"`         // 文件ID
+	TargetPosition string `json:"targetPosition" binding:"required"` // 目标岗位
+	JD             string `json:"jd"`                                // 职位描述（选填）
 }
 
 // OptimizeResponse 优化建议响应
 type OptimizeResponse struct {
-	ResumeID       int64            `json:"resumeId"`
-	TargetPosition string           `json:"targetPosition"`
-	Diagnoses      []DiagnosisDTO   `json:"diagnoses"`
-	StarRewrites   []StarRewriteDTO `json:"starRewrites"`
-	JdMatch        JdMatchResultDTO `json:"jdMatch"`
+	ResumeID       int64            `json:"resumeId"`       // 简历ID
+	TargetPosition string           `json:"targetPosition"` // 目标岗位
+	Diagnoses      []DiagnosisDTO   `json:"diagnoses"`      // 缺陷诊断列表
+	StarRewrites   []StarRewriteDTO `json:"starRewrites"`   // STAR法则改写建议列表
+	JdMatch        JdMatchResultDTO `json:"jdMatch"`        // JD匹配结果
 }
 
 // DiagnosisDTO 缺陷诊断DTO
 type DiagnosisDTO struct {
-	Target     string `json:"target"`
-	Issue      string `json:"issue"`
-	Severity   string `json:"severity"`
-	Suggestion string `json:"suggestion"`
-	Type       string `json:"type"`
+	Target     string `json:"target"`     // 诊断目标（简历中的具体位置或内容）
+	Issue      string `json:"issue"`      // 发现的问题
+	Severity   string `json:"severity"`   // 严重程度（high/medium/low）
+	Suggestion string `json:"suggestion"` // 改进建议
+	Type       string `json:"type"`       // 问题类型（如：completeness/professionalism/quantification/formatting）
 }
 
 // StarRewriteDTO STAR改写DTO
 type StarRewriteDTO struct {
-	Original  string `json:"original"`
-	Rewritten string `json:"rewritten"`
-	Section   string `json:"section"`
+	Original  string `json:"original"`  // 原始内容
+	Rewritten string `json:"rewritten"` // 改写后的内容
+	Section   string `json:"section"`   // 所属章节（如：工作经历、项目经历）
 }
 
 // JdMatchResultDTO JD匹配结果DTO
 type JdMatchResultDTO struct {
-	MatchScore    int                `json:"matchScore"`
-	MatchedSkills []string           `json:"matchedSkills"`
-	MissingSkills []string           `json:"missingSkills"`
-	GapAnalysis   []GapSuggestionDTO `json:"gapAnalysis"`
+	MatchScore    int                `json:"matchScore"`    // 匹配分数（0-100）
+	MatchedSkills []string           `json:"matchedSkills"` // 已匹配技能列表
+	MissingSkills []string           `json:"missingSkills"` // 缺失技能列表
+	GapAnalysis   []GapSuggestionDTO `json:"gapAnalysis"`   // 差距分析与建议列表
 }
 
-// GapSuggestionDTO 间隙建议DTO
+// GapSuggestionDTO 技能差距分析与改进建议DTO
 type GapSuggestionDTO struct {
-	Skill      string `json:"skill"`
-	Importance string `json:"importance"`
-	Suggestion string `json:"suggestion"`
-	Type       string `json:"type"`
+	Skill      string `json:"skill"`      // 技能名称
+	Importance string `json:"importance"` // 重要程度（required/preferred/bonus）
+	Suggestion string `json:"suggestion"` // 获取该技能的建议
+	Type       string `json:"type"`       // 技能类型（如：technical/soft/domain）
 }
