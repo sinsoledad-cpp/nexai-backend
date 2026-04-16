@@ -40,11 +40,12 @@ func (h *ResumeHandler) RegisterRoutes(e *gin.Engine) {
 	v1 := e.Group("/v1")
 	resumes := v1.Group("/resumes")
 
-	resumes.POST("/upload", ginx.WrapClaims(h.Upload)) // 上传简历
-	resumes.POST("/parse", ginx.WrapBody(h.Parse))     // 解析简历
-	resumes.POST("/correct", ginx.WrapBody(h.Correct)) // 修正简历
-	resumes.POST("/score", ginx.WrapBody(h.Score))     // 评分简历
-	resumes.GET("/:id", ginx.Wrap(h.GetById))          // 获取简历
+	resumes.POST("/upload", ginx.WrapClaims(h.Upload))   // 上传简历
+	resumes.POST("/parse", ginx.WrapBody(h.Parse))       // 解析简历
+	resumes.POST("/correct", ginx.WrapBody(h.Correct))   // 修正简历
+	resumes.POST("/score", ginx.WrapBody(h.Score))       // 评分简历
+	resumes.POST("/optimize", ginx.WrapBody(h.Optimize)) // 优化建议
+	resumes.GET("/:id", ginx.Wrap(h.GetById))            // 获取简历
 }
 
 // Upload 处理文件上传
@@ -231,6 +232,35 @@ func (h *ResumeHandler) GetById(ctx *gin.Context) (ginx.Result, error) {
 	}, nil
 }
 
+// Optimize 处理优化建议
+func (h *ResumeHandler) Optimize(ctx *gin.Context, req dto.OptimizeRequest) (ginx.Result, error) {
+	result, err := h.svc.Optimize(ctx.Request.Context(), 0, req.FileID, req.TargetPosition, req.JD)
+	if err != nil {
+		if errors.Is(err, resumeservice.ErrResumeNotFound) {
+			return ginx.Result{
+				Code: errs.ResumeFileNotFound,
+				Msg:  "简历文件不存在",
+			}, err
+		}
+		if errors.Is(err, resumeservice.ErrNotParsed) {
+			return ginx.Result{
+				Code: errs.ResumeNotParsed,
+				Msg:  "简历尚未解析，请先解析简历",
+			}, err
+		}
+		return ginx.Result{
+			Code: errs.ResumeOptimizeFailed,
+			Msg:  "优化建议生成失败",
+		}, err
+	}
+
+	return ginx.Result{
+		Code: http.StatusOK,
+		Msg:  "优化建议生成完成",
+		Data: h.toOptimizeResponse(result),
+	}, nil
+}
+
 // toParseResponse 将领域模型转换为响应DTO
 func (h *ResumeHandler) toParseResponse(parsed domain.ParsedResume) dto.ParseResponse {
 	resp := dto.ParseResponse{
@@ -347,6 +377,52 @@ func (h *ResumeHandler) toScoreResponse(result domain.ScoreResult) dto.ScoreResp
 				Score:   result.Dimensions.Format.Score,
 				Reasons: result.Dimensions.Format.Reasons,
 			},
+		},
+	}
+}
+
+// toOptimizeResponse 将优化结果转换为响应DTO
+func (h *ResumeHandler) toOptimizeResponse(result domain.OptimizationResult) dto.OptimizeResponse {
+	diagnoses := make([]dto.DiagnosisDTO, 0, len(result.Diagnoses))
+	for _, d := range result.Diagnoses {
+		diagnoses = append(diagnoses, dto.DiagnosisDTO{
+			Target:     d.Target,
+			Issue:      d.Issue,
+			Severity:   d.Severity,
+			Suggestion: d.Suggestion,
+			Type:       d.Type,
+		})
+	}
+
+	starRewrites := make([]dto.StarRewriteDTO, 0, len(result.StarRewrites))
+	for _, r := range result.StarRewrites {
+		starRewrites = append(starRewrites, dto.StarRewriteDTO{
+			Original:  r.Original,
+			Rewritten: r.Rewritten,
+			Section:   r.Section,
+		})
+	}
+
+	gapAnalysis := make([]dto.GapSuggestionDTO, 0, len(result.JdMatch.GapAnalysis))
+	for _, g := range result.JdMatch.GapAnalysis {
+		gapAnalysis = append(gapAnalysis, dto.GapSuggestionDTO{
+			Skill:      g.Skill,
+			Importance: g.Importance,
+			Suggestion: g.Suggestion,
+			Type:       g.Type,
+		})
+	}
+
+	return dto.OptimizeResponse{
+		ResumeID:       result.ResumeID,
+		TargetPosition: result.TargetPosition,
+		Diagnoses:      diagnoses,
+		StarRewrites:   starRewrites,
+		JdMatch: dto.JdMatchResultDTO{
+			MatchScore:    result.JdMatch.MatchScore,
+			MatchedSkills: result.JdMatch.MatchedSkills,
+			MissingSkills: result.JdMatch.MissingSkills,
+			GapAnalysis:   gapAnalysis,
 		},
 	}
 }

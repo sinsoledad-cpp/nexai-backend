@@ -91,3 +91,51 @@ type DimensionScoreDTO struct {
 	Score   int      `json:"score"`   // 分数（0-100）
 	Reasons []string `json:"reasons"` // 评分理由
 }
+
+// OptimizeRequest 优化建议请求
+type OptimizeRequest struct {
+	FileID         int64  `json:"fileId" binding:"required"`
+	TargetPosition string `json:"targetPosition" binding:"required"`
+	JD             string `json:"jd"`
+}
+
+// OptimizeResponse 优化建议响应
+type OptimizeResponse struct {
+	ResumeID       int64            `json:"resumeId"`
+	TargetPosition string           `json:"targetPosition"`
+	Diagnoses      []DiagnosisDTO   `json:"diagnoses"`
+	StarRewrites   []StarRewriteDTO `json:"starRewrites"`
+	JdMatch        JdMatchResultDTO `json:"jdMatch"`
+}
+
+// DiagnosisDTO 缺陷诊断DTO
+type DiagnosisDTO struct {
+	Target     string `json:"target"`
+	Issue      string `json:"issue"`
+	Severity   string `json:"severity"`
+	Suggestion string `json:"suggestion"`
+	Type       string `json:"type"`
+}
+
+// StarRewriteDTO STAR改写DTO
+type StarRewriteDTO struct {
+	Original  string `json:"original"`
+	Rewritten string `json:"rewritten"`
+	Section   string `json:"section"`
+}
+
+// JdMatchResultDTO JD匹配结果DTO
+type JdMatchResultDTO struct {
+	MatchScore    int                `json:"matchScore"`
+	MatchedSkills []string           `json:"matchedSkills"`
+	MissingSkills []string           `json:"missingSkills"`
+	GapAnalysis   []GapSuggestionDTO `json:"gapAnalysis"`
+}
+
+// GapSuggestionDTO 间隙建议DTO
+type GapSuggestionDTO struct {
+	Skill      string `json:"skill"`
+	Importance string `json:"importance"`
+	Suggestion string `json:"suggestion"`
+	Type       string `json:"type"`
+}

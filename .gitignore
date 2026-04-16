@@ -7,5 +7,5 @@
 out
 gen
 
-/.env
+.env
 /storage/

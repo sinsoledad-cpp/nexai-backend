@@ -10,4 +10,5 @@ const (
 	ResumeParseFailed         = 502002 // 解析失败
 	ResumeScoreFailed         = 502003 // 评分失败
 	ResumeNotParsed           = 402005 // 未解析
+	ResumeOptimizeFailed      = 502004 // 优化建议失败
 )

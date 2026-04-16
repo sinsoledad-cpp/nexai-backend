@@ -26,22 +26,25 @@ type ResumeService interface {
 	Parse(ctx context.Context, uid int64, fileID int64) (domain.ParsedResume, error)
 	Correct(ctx context.Context, uid int64, fileID int64, parsed domain.ParsedResume) (domain.ParsedResume, error)
 	Score(ctx context.Context, uid int64, fileID int64, targetPosition string) (domain.ScoreResult, error)
+	Optimize(ctx context.Context, uid int64, fileID int64, targetPosition string, jd string) (domain.OptimizationResult, error)
 	FindById(ctx context.Context, id int64) (domain.Resume, error)
 }
 
 type DefaultResumeService struct {
-	l      logger.Logger
-	repo   repository.ResumeRepository
-	parser *ParseWorkflow
-	scorer *ScoringWorkflow
+	l         logger.Logger
+	repo      repository.ResumeRepository
+	parser    *ParseWorkflow
+	scorer    *ScoringWorkflow
+	optimizer *OptimizationWorkflow
 }
 
-func NewResumeService(l logger.Logger, repo repository.ResumeRepository, parser *ParseWorkflow, scorer *ScoringWorkflow) ResumeService {
+func NewResumeService(l logger.Logger, repo repository.ResumeRepository, parser *ParseWorkflow, scorer *ScoringWorkflow, optimizer *OptimizationWorkflow) ResumeService {
 	return &DefaultResumeService{
-		l:      l,
-		repo:   repo,
-		parser: parser,
-		scorer: scorer,
+		l:         l,
+		repo:      repo,
+		parser:    parser,
+		scorer:    scorer,
+		optimizer: optimizer,
 	}
 }
 
@@ -160,4 +163,26 @@ func (svc *DefaultResumeService) Score(ctx context.Context, uid int64, fileID in
 
 func (svc *DefaultResumeService) FindById(ctx context.Context, id int64) (domain.Resume, error) {
 	return svc.repo.FindById(ctx, id)
+}
+
+func (svc *DefaultResumeService) Optimize(ctx context.Context, uid int64, fileID int64, targetPosition string, jd string) (domain.OptimizationResult, error) {
+	resume, err := svc.repo.FindById(ctx, fileID)
+	if err != nil {
+		return domain.OptimizationResult{}, err
+	}
+
+	if resume.Status < domain.StatusParsed {
+		return domain.OptimizationResult{}, ErrNotParsed
+	}
+
+	parsedData, _ := json.Marshal(resume.Parsed)
+	result, err := svc.optimizer.Evaluate(ctx, string(parsedData), targetPosition, jd)
+	if err != nil {
+		svc.l.Error("优化建议失败", logger.Error(err), logger.Int64("resumeId", fileID))
+		return domain.OptimizationResult{}, err
+	}
+
+	result.ResumeID = fileID
+	result.TargetPosition = targetPosition
+	return result, nil
 }
