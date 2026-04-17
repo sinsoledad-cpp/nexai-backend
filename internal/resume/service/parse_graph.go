@@ -128,8 +128,8 @@ func (pw *ParseWorkflow) llmExtractNode(ctx context.Context, input *cleanedText)
 			},
 			"skills": {
 				Type:     schema.Array,
-				ElemInfo: &schema.ParameterInfo{Type: schema.String},
-				Desc:     "技能列表",
+				ElemInfo: &schema.ParameterInfo{Type: schema.Object},
+				Desc:     "技能描述列表，每项包含description(一句话技能描述，如：熟练掌握golang编程语言，了解GMP模型以及GC机制)",
 			},
 		}),
 	}
@@ -141,7 +141,7 @@ func (pw *ParseWorkflow) llmExtractNode(ctx context.Context, input *cleanedText)
 2. 教育背景：学校、学位、专业、起止时间
 3. 工作经历：公司、职位、起止时间、工作描述
 4. 项目经验：项目名、角色、起止时间、项目描述
-5. 技能栈：所有技能关键词
+5. 技能描述：按分类归纳技能，每条包含分类和描述性文字
 
 注意事项：
 - 你需要处理各种行业的简历，包括但不限于IT、金融、医疗、教育、法律、制造业等
@@ -194,7 +194,9 @@ func (pw *ParseWorkflow) llmExtractNode(ctx context.Context, input *cleanedText)
 					EndDate     string `json:"end_date"`
 					Description string `json:"description"`
 				} `json:"projects"`
-				Skills []string `json:"skills"`
+				Skills []struct {
+					Description string `json:"description"`
+				} `json:"skills"`
 			}
 			if err := json.Unmarshal([]byte(toolCall.Function.Arguments), &result); err != nil {
 				pw.l.Error("解析LLM返回结果失败", logger.Error(err))
@@ -209,7 +211,6 @@ func (pw *ParseWorkflow) llmExtractNode(ctx context.Context, input *cleanedText)
 					Address: result.Address,
 					Summary: result.Summary,
 				},
-				Skills: result.Skills,
 			}
 
 			for _, edu := range result.Education {
@@ -242,6 +243,12 @@ func (pw *ParseWorkflow) llmExtractNode(ctx context.Context, input *cleanedText)
 				})
 			}
 
+			for _, skill := range result.Skills {
+				parsed.Skills = append(parsed.Skills, domain.SkillItem{
+					Description: skill.Description,
+				})
+			}
+
 			return parsed, nil
 		}
 	}
@@ -258,7 +265,7 @@ func (pw *ParseWorkflow) schemaValidateNode(ctx context.Context, input *domain.P
 		input.PersonalInfo.Name = "未知"
 	}
 	if len(input.Skills) == 0 {
-		input.Skills = []string{}
+		input.Skills = []domain.SkillItem{}
 	}
 	if len(input.Education) == 0 {
 		input.Education = []domain.Education{}
@@ -281,7 +288,7 @@ func (pw *ParseWorkflow) fallbackExtract(input *cleanedText) *domain.ParsedResum
 		Education:      []domain.Education{},
 		WorkExperience: []domain.WorkExperience{},
 		Projects:       []domain.Project{},
-		Skills:         []string{},
+		Skills:         []domain.SkillItem{},
 	}
 	return result
 }
@@ -295,7 +302,7 @@ func (pw *ParseWorkflow) parseFromContent(content string) *domain.ParsedResume {
 		Education:      []domain.Education{},
 		WorkExperience: []domain.WorkExperience{},
 		Projects:       []domain.Project{},
-		Skills:         []string{},
+		Skills:         []domain.SkillItem{},
 	}
 	return result
 }

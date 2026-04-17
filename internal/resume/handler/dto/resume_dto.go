@@ -18,7 +18,7 @@ type ParseResponse struct {
 	Education      []EducationDTO      `json:"education"`      // 教育背景
 	WorkExperience []WorkExperienceDTO `json:"workExperience"` // 工作经历
 	Projects       []ProjectDTO        `json:"projects"`       // 项目经验
-	Skills         []string            `json:"skills"`         // 技能栈
+	Skills         []SkillItemDTO      `json:"skills"`         // 技能描述
 }
 
 // PersonalInfoDTO 个人信息DTO
@@ -55,6 +55,11 @@ type ProjectDTO struct {
 	StartDate   string `json:"startDate"`   // 开始时间
 	EndDate     string `json:"endDate"`     // 结束时间
 	Description string `json:"description"` // 项目描述
+}
+
+// SkillItemDTO 技能描述DTO
+type SkillItemDTO struct {
+	Description string `json:"description"` // 技能描述
 }
 
 // CorrectRequest 修正请求

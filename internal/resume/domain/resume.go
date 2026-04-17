@@ -33,7 +33,7 @@ type ParsedResume struct {
 	Education      []Education      `json:"education"`      // 教育背景
 	WorkExperience []WorkExperience `json:"workExperience"` // 工作经历
 	Projects       []Project        `json:"projects"`       // 项目经验
-	Skills         []string         `json:"skills"`         // 技能栈
+	Skills         []SkillItem      `json:"skills"`         // 技能描述
 }
 
 // PersonalInfo 个人信息
@@ -70,4 +70,9 @@ type Project struct {
 	StartDate   string `json:"startDate"`   // 开始时间
 	EndDate     string `json:"endDate"`     // 结束时间
 	Description string `json:"description"` // 项目描述
+}
+
+// SkillItem 技能描述项
+type SkillItem struct {
+	Description string `json:"description"` // 技能描述（如：熟练掌握golang编程语言，了解GMP模型以及GC机制）
 }

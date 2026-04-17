@@ -245,32 +245,64 @@ func (e *TextExtractor) mergeLineItems(items []pdf.Text) string {
 		avgFontSize += t.FontSize
 	}
 	avgFontSize /= float64(len(items))
-
 	if avgFontSize < 1 {
 		avgFontSize = 12
 	}
-
-	spaceThreshold := avgFontSize * 0.4
-	tabThreshold := avgFontSize * 2.5
 
 	var buf strings.Builder
 	for j, t := range items {
 		if j > 0 {
 			prev := items[j-1]
-			gap := t.X - (prev.X + prev.W)
+			prevHasCJK := e.containsCJK(prev.S)
+			currHasCJK := e.containsCJK(t.S)
 
-			if gap <= spaceThreshold {
-				prevHasCJK := e.containsCJK(prev.S)
-				currHasCJK := e.containsCJK(t.S)
-				if prevHasCJK || currHasCJK {
-					// CJK text: no space between adjacent characters
-				} else {
-					buf.WriteString("")
-				}
-			} else if gap <= tabThreshold {
-				buf.WriteString(" ")
+			var gap float64
+			if prev.W > 0 {
+				gap = t.X - (prev.X + prev.W)
 			} else {
-				buf.WriteString("\t")
+				xDist := t.X - prev.X
+				if prevHasCJK && currHasCJK {
+					if xDist < avgFontSize*0.5 {
+						gap = 0
+					} else {
+						gap = xDist - avgFontSize
+					}
+				} else if !prevHasCJK && !currHasCJK {
+					if xDist < avgFontSize*0.6 {
+						gap = 0
+					} else {
+						gap = xDist - avgFontSize*0.5
+					}
+				} else {
+					if xDist < avgFontSize*0.55 {
+						gap = 0
+					} else {
+						gap = xDist - avgFontSize*0.7
+					}
+				}
+			}
+
+			if prevHasCJK && currHasCJK {
+				if gap < avgFontSize*0.5 {
+				} else if gap < avgFontSize*2 {
+					buf.WriteString(" ")
+				} else {
+					buf.WriteString("\t")
+				}
+			} else if prevHasCJK || currHasCJK {
+				if gap < avgFontSize*0.3 {
+				} else if gap < avgFontSize*1.5 {
+					buf.WriteString(" ")
+				} else {
+					buf.WriteString("\t")
+				}
+			} else {
+				if gap < avgFontSize*0.5 {
+				} else if gap < avgFontSize*1.5 {
+					buf.WriteString(" ")
+				} else {
+					buf.WriteString("\t")
+				}
 			}
 		}
 		buf.WriteString(t.S)

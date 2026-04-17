@@ -271,7 +271,12 @@ func (h *ResumeHandler) toParseResponse(parsed domain.ParsedResume) dto.ParseRes
 			Address: parsed.PersonalInfo.Address,
 			Summary: parsed.PersonalInfo.Summary,
 		},
-		Skills: parsed.Skills,
+	}
+
+	for _, s := range parsed.Skills {
+		resp.Skills = append(resp.Skills, dto.SkillItemDTO{
+			Description: s.Description,
+		})
 	}
 
 	for _, edu := range parsed.Education {
@@ -317,7 +322,12 @@ func (h *ResumeHandler) toDomainParsed(dtoParsed dto.ParseResponse) domain.Parse
 			Address: dtoParsed.PersonalInfo.Address,
 			Summary: dtoParsed.PersonalInfo.Summary,
 		},
-		Skills: dtoParsed.Skills,
+	}
+
+	for _, s := range dtoParsed.Skills {
+		parsed.Skills = append(parsed.Skills, domain.SkillItem{
+			Description: s.Description,
+		})
 	}
 
 	for _, edu := range dtoParsed.Education {
