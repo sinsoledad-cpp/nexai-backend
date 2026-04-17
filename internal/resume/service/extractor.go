@@ -6,6 +6,8 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"math"
+	"sort"
 	"strings"
 
 	"github.com/ledongthuc/pdf"
@@ -43,13 +45,9 @@ func (e *TextExtractor) extractFromPDF(data []byte) (string, error) {
 		if page.V.IsNull() {
 			continue
 		}
-		text, err := page.GetPlainText(nil)
-		if err != nil {
-			continue
-		}
-		buf.WriteString(text)
-		if !strings.HasSuffix(text, "\n") {
-			buf.WriteString("\n")
+		pageText := e.extractPDFPageText(page)
+		if pageText != "" {
+			buf.WriteString(pageText)
 		}
 	}
 
@@ -58,6 +56,180 @@ func (e *TextExtractor) extractFromPDF(data []byte) (string, error) {
 		return "", fmt.Errorf("PDF中未提取到文本内容，可能是扫描版PDF")
 	}
 	return result, nil
+}
+
+type pdfTextLine struct {
+	y     float64
+	items []pdf.Text
+}
+
+func (e *TextExtractor) extractPDFPageText(page pdf.Page) string {
+	content := page.Content()
+	if len(content.Text) == 0 {
+		text, err := page.GetPlainText(nil)
+		if err != nil {
+			return ""
+		}
+		return text
+	}
+
+	var texts []pdf.Text
+	for _, t := range content.Text {
+		if strings.TrimSpace(t.S) != "" {
+			texts = append(texts, t)
+		}
+	}
+	if len(texts) == 0 {
+		return ""
+	}
+
+	var lines []pdfTextLine
+	for _, t := range texts {
+		added := false
+		for i := range lines {
+			if math.Abs(t.Y-lines[i].y) < 3 {
+				lines[i].items = append(lines[i].items, t)
+				added = true
+				break
+			}
+		}
+		if !added {
+			lines = append(lines, pdfTextLine{y: t.Y, items: []pdf.Text{t}})
+		}
+	}
+
+	sort.Slice(lines, func(i, j int) bool {
+		return lines[i].y > lines[j].y
+	})
+
+	for i := range lines {
+		sort.Slice(lines[i].items, func(j, k int) bool {
+			return lines[i].items[j].X < lines[i].items[k].X
+		})
+	}
+
+	colXs := e.detectColumns(lines)
+
+	if len(colXs) >= 2 {
+		return e.formatByColumn(lines, colXs)
+	}
+
+	return e.formatByRow(lines)
+}
+
+func (e *TextExtractor) detectColumns(lines []pdfTextLine) []float64 {
+	xCounts := make(map[int]int)
+	for _, l := range lines {
+		seen := make(map[int]bool)
+		for _, t := range l.items {
+			rx := int(math.Round(t.X/10) * 10)
+			if !seen[rx] {
+				xCounts[rx]++
+				seen[rx] = true
+			}
+		}
+	}
+
+	minLines := len(lines) * 3 / 10
+	if minLines < 2 {
+		minLines = 2
+	}
+
+	var candidates []float64
+	for rx, count := range xCounts {
+		if count >= minLines {
+			candidates = append(candidates, float64(rx))
+		}
+	}
+	sort.Float64s(candidates)
+
+	if len(candidates) < 2 {
+		return nil
+	}
+
+	var groups []float64
+	groupStart := candidates[0]
+	groupEnd := candidates[0]
+
+	for i := 1; i < len(candidates); i++ {
+		if candidates[i]-groupEnd <= 40 {
+			groupEnd = candidates[i]
+		} else {
+			groups = append(groups, (groupStart+groupEnd)/2)
+			groupStart = candidates[i]
+			groupEnd = candidates[i]
+		}
+	}
+	groups = append(groups, (groupStart+groupEnd)/2)
+
+	hasSignificantGap := false
+	for i := 1; i < len(groups); i++ {
+		if groups[i]-groups[i-1] > 50 {
+			hasSignificantGap = true
+			break
+		}
+	}
+
+	if !hasSignificantGap {
+		return nil
+	}
+	return groups
+}
+
+func (e *TextExtractor) formatByColumn(lines []pdfTextLine, colXs []float64) string {
+	type columnData struct {
+		x       float64
+		entries []string
+	}
+	cols := make([]columnData, len(colXs))
+	for i, x := range colXs {
+		cols[i].x = x
+	}
+
+	for _, l := range lines {
+		for _, t := range l.items {
+			best := 0
+			bestDist := math.Abs(t.X - cols[0].x)
+			for i := 1; i < len(cols); i++ {
+				d := math.Abs(t.X - cols[i].x)
+				if d < bestDist {
+					bestDist = d
+					best = i
+				}
+			}
+			cols[best].entries = append(cols[best].entries, t.S)
+		}
+	}
+
+	var buf strings.Builder
+	for _, col := range cols {
+		for _, s := range col.entries {
+			buf.WriteString(s)
+			buf.WriteString("\n")
+		}
+	}
+	return buf.String()
+}
+
+func (e *TextExtractor) formatByRow(lines []pdfTextLine) string {
+	var buf strings.Builder
+	for i, l := range lines {
+		if i > 0 {
+			buf.WriteString("\n")
+		}
+		for j, t := range l.items {
+			if j > 0 {
+				gap := t.X - (l.items[j-1].X + l.items[j-1].W)
+				if gap > 20 {
+					buf.WriteString("\t")
+				} else {
+					buf.WriteString(" ")
+				}
+			}
+			buf.WriteString(t.S)
+		}
+	}
+	return buf.String()
 }
 
 func (e *TextExtractor) extractFromDocx(data []byte) (string, error) {
@@ -100,6 +272,9 @@ func (e *TextExtractor) parseDocxXML(file *zip.File) (string, error) {
 	decoder := xml.NewDecoder(bytes.NewReader(content))
 	var buf strings.Builder
 	var inText bool
+	var inTableCell bool
+	var cellBuf strings.Builder
+	var rowCells []string
 
 	for {
 		token, err := decoder.Token()
@@ -112,19 +287,43 @@ func (e *TextExtractor) parseDocxXML(file *zip.File) (string, error) {
 
 		switch t := token.(type) {
 		case xml.StartElement:
-			if t.Name.Local == "t" {
+			switch t.Name.Local {
+			case "t":
 				inText = true
+			case "tc":
+				inTableCell = true
+				cellBuf.Reset()
 			}
 		case xml.CharData:
 			if inText {
-				buf.WriteString(string(t))
+				if inTableCell {
+					cellBuf.WriteString(string(t))
+				} else {
+					buf.WriteString(string(t))
+				}
 			}
 		case xml.EndElement:
-			if t.Name.Local == "p" {
-				buf.WriteString("\n")
-			}
-			if t.Name.Local == "t" {
+			switch t.Name.Local {
+			case "p":
+				if inTableCell {
+					cellBuf.WriteString("\n")
+				} else {
+					buf.WriteString("\n")
+				}
+			case "t":
 				inText = false
+			case "tc":
+				inTableCell = false
+				cellContent := strings.TrimSpace(cellBuf.String())
+				if cellContent != "" {
+					rowCells = append(rowCells, cellContent)
+				}
+			case "tr":
+				if len(rowCells) > 0 {
+					buf.WriteString(strings.Join(rowCells, "\t"))
+					buf.WriteString("\n")
+				}
+				rowCells = rowCells[:0]
 			}
 		}
 	}

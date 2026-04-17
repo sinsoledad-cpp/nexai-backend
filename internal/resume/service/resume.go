@@ -7,6 +7,7 @@ import (
 	"nexai-backend/internal/resume/domain"
 	"nexai-backend/internal/resume/repository"
 	"nexai-backend/pkg/logger"
+	"os"
 	"path/filepath"
 	"strings"
 )
@@ -53,7 +54,7 @@ func NewResumeService(l logger.Logger, repo repository.ResumeRepository, parser 
 	}
 }
 
-// Upload 处理简历上传：验证文件类型和大小，提取文本内容
+// Upload 处理简历上传：验证文件类型和大小，保存文件到磁盘，提取文本内容
 func (svc *DefaultResumeService) Upload(ctx context.Context, uid int64, fileName string, fileData []byte) (domain.Resume, error) {
 	ext := strings.ToLower(filepath.Ext(fileName))
 	if ext != ".pdf" && ext != ".docx" && ext != ".doc" && ext != ".png" && ext != ".jpg" && ext != ".jpeg" {
@@ -77,6 +78,13 @@ func (svc *DefaultResumeService) Upload(ctx context.Context, uid int64, fileName
 	r, err := svc.repo.Create(ctx, resume)
 	if err != nil {
 		return domain.Resume{}, err
+	}
+
+	diskPath := "." + fileURL
+	if err := os.MkdirAll(filepath.Dir(diskPath), 0755); err != nil {
+		svc.l.Error("创建存储目录失败", logger.Error(err))
+	} else if err := os.WriteFile(diskPath, fileData, 0644); err != nil {
+		svc.l.Error("保存简历文件失败", logger.Error(err), logger.String("path", diskPath))
 	}
 
 	rawText, err := svc.parser.ExtractText(ctx, ext, fileData)
