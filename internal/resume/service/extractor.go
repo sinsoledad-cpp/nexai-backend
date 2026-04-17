@@ -9,6 +9,7 @@ import (
 	"math"
 	"sort"
 	"strings"
+	"unicode"
 
 	"github.com/ledongthuc/pdf"
 )
@@ -177,9 +178,13 @@ func (e *TextExtractor) detectColumns(lines []pdfTextLine) []float64 {
 }
 
 func (e *TextExtractor) formatByColumn(lines []pdfTextLine, colXs []float64) string {
+	type columnLine struct {
+		y     float64
+		items []pdf.Text
+	}
 	type columnData struct {
-		x       float64
-		entries []string
+		x     float64
+		lines []columnLine
 	}
 	cols := make([]columnData, len(colXs))
 	for i, x := range colXs {
@@ -187,6 +192,7 @@ func (e *TextExtractor) formatByColumn(lines []pdfTextLine, colXs []float64) str
 	}
 
 	for _, l := range lines {
+		colItems := make([][]pdf.Text, len(colXs))
 		for _, t := range l.items {
 			best := 0
 			bestDist := math.Abs(t.X - cols[0].x)
@@ -197,14 +203,20 @@ func (e *TextExtractor) formatByColumn(lines []pdfTextLine, colXs []float64) str
 					best = i
 				}
 			}
-			cols[best].entries = append(cols[best].entries, t.S)
+			colItems[best] = append(colItems[best], t)
+		}
+		for i, items := range colItems {
+			if len(items) > 0 {
+				cols[i].lines = append(cols[i].lines, columnLine{y: l.y, items: items})
+			}
 		}
 	}
 
 	var buf strings.Builder
 	for _, col := range cols {
-		for _, s := range col.entries {
-			buf.WriteString(s)
+		for _, l := range col.lines {
+			lineText := e.mergeLineItems(l.items)
+			buf.WriteString(lineText)
 			buf.WriteString("\n")
 		}
 	}
@@ -217,19 +229,62 @@ func (e *TextExtractor) formatByRow(lines []pdfTextLine) string {
 		if i > 0 {
 			buf.WriteString("\n")
 		}
-		for j, t := range l.items {
-			if j > 0 {
-				gap := t.X - (l.items[j-1].X + l.items[j-1].W)
-				if gap > 20 {
-					buf.WriteString("\t")
-				} else {
-					buf.WriteString(" ")
-				}
-			}
-			buf.WriteString(t.S)
-		}
+		lineText := e.mergeLineItems(l.items)
+		buf.WriteString(lineText)
 	}
 	return buf.String()
+}
+
+func (e *TextExtractor) mergeLineItems(items []pdf.Text) string {
+	if len(items) == 0 {
+		return ""
+	}
+
+	var avgFontSize float64
+	for _, t := range items {
+		avgFontSize += t.FontSize
+	}
+	avgFontSize /= float64(len(items))
+
+	if avgFontSize < 1 {
+		avgFontSize = 12
+	}
+
+	spaceThreshold := avgFontSize * 0.4
+	tabThreshold := avgFontSize * 2.5
+
+	var buf strings.Builder
+	for j, t := range items {
+		if j > 0 {
+			prev := items[j-1]
+			gap := t.X - (prev.X + prev.W)
+
+			if gap <= spaceThreshold {
+				prevHasCJK := e.containsCJK(prev.S)
+				currHasCJK := e.containsCJK(t.S)
+				if prevHasCJK || currHasCJK {
+					// CJK text: no space between adjacent characters
+				} else {
+					buf.WriteString("")
+				}
+			} else if gap <= tabThreshold {
+				buf.WriteString(" ")
+			} else {
+				buf.WriteString("\t")
+			}
+		}
+		buf.WriteString(t.S)
+	}
+	return buf.String()
+}
+
+func (e *TextExtractor) containsCJK(s string) bool {
+	for _, r := range s {
+		if unicode.Is(unicode.Han, r) || unicode.Is(unicode.Hangul, r) || unicode.Is(unicode.Katakana, r) || unicode.Is(unicode.Hiragana, r) {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *TextExtractor) extractFromDocx(data []byte) (string, error) {
