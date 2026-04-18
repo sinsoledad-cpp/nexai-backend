@@ -104,7 +104,7 @@ func TestUserHandler_SignUp(t *testing.T) {
 			},
 			wantResult: ginx.Result{
 				Code: errs.UserInvalidInput,
-				Msg:  "密码必须包含数字、特殊字符、大小字母，并且长度不能小于 8 位",
+				Msg:  "密码长度至少为6位",
 			},
 			wantErr: nil,
 		},
@@ -262,13 +262,14 @@ func TestUserHandler_RefreshToken(t *testing.T) {
 			mock: func(ctrl *gomock.Controller) jwtware.Handler {
 				hdl := jwtmocks.NewMockHandler(ctrl)
 				hdl.EXPECT().CheckSession(gomock.Any(), "ssid-123").Return(nil)
-				hdl.EXPECT().SetJWTToken(gomock.Any(), int64(123), "ssid-123").Return(nil)
+				hdl.EXPECT().SetJWTToken(gomock.Any(), int64(123), "ssid-123").Return("access_token", nil)
 				return hdl
 			},
 			token: genToken(123, "ssid-123"),
 			wantResult: ginx.Result{
 				Code: http.StatusOK,
 				Msg:  "刷新成功",
+				Data: dto.RefreshTokenResponse{AccessToken: "access_token"},
 			},
 			wantErr: nil,
 		},
@@ -300,9 +301,9 @@ func TestUserHandler_RefreshToken(t *testing.T) {
 
 			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 			ctx.Request = httptest.NewRequest("POST", "/users/refresh_token", nil)
-			ctx.Request.Header.Set("X-Refresh-Token", tc.token)
 
-			res, err := h.RefreshToken(ctx)
+			req := dto.RefreshTokenRequest{RefreshToken: tc.token}
+			res, err := h.RefreshToken(ctx, req)
 
 			assert.Equal(t, tc.wantErr, err)
 			assert.Equal(t, tc.wantResult, res)
@@ -328,7 +329,10 @@ func TestUserHandler_LoginJWT(t *testing.T) {
 				svc.EXPECT().Login(gomock.Any(), "test@example.com", "Password123!").Return(domain.User{
 					ID: 123,
 				}, nil)
-				jwtHdl.EXPECT().SetLoginToken(gomock.Any(), int64(123)).Return(nil)
+				jwtHdl.EXPECT().SetLoginToken(gomock.Any(), int64(123)).Return(jwtware.TokenPair{
+					AccessToken:  "access_token",
+					RefreshToken: "refresh_token",
+				}, nil)
 				return svc, jwtHdl
 			},
 			req: dto.LoginRequest{
@@ -338,6 +342,11 @@ func TestUserHandler_LoginJWT(t *testing.T) {
 			wantResult: ginx.Result{
 				Code: http.StatusOK,
 				Msg:  "登录成功",
+				Data: dto.LoginResponse{
+					AccessToken:  "access_token",
+					RefreshToken: "refresh_token",
+					User:         dto.ProfileResponse{ID: 123},
+				},
 			},
 			wantErr: nil,
 		},
@@ -433,7 +442,7 @@ func TestUserHandler_Edit(t *testing.T) {
 			uc: jwtware.UserClaims{Uid: 123},
 			wantResult: ginx.Result{
 				Code: http.StatusOK,
-				Msg:  "上传成功",
+				Msg:  "更新成功",
 			},
 			wantErr: nil,
 		},
@@ -562,7 +571,10 @@ func TestUserHandler_LoginSMS(t *testing.T) {
 
 				codeSvc.EXPECT().Verify(gomock.Any(), "login", "12345678901", "123456").Return(true, nil)
 				userSvc.EXPECT().FindOrCreate(gomock.Any(), "12345678901").Return(domain.User{ID: 123}, nil)
-				jwtHdl.EXPECT().SetLoginToken(gomock.Any(), int64(123)).Return(nil)
+				jwtHdl.EXPECT().SetLoginToken(gomock.Any(), int64(123)).Return(jwtware.TokenPair{
+					AccessToken:  "access_token",
+					RefreshToken: "refresh_token",
+				}, nil)
 
 				return codeSvc, userSvc, jwtHdl
 			},
@@ -573,6 +585,11 @@ func TestUserHandler_LoginSMS(t *testing.T) {
 			wantResult: ginx.Result{
 				Code: http.StatusOK,
 				Msg:  "登录成功",
+				Data: dto.SMSLoginResponse{
+					AccessToken:  "access_token",
+					RefreshToken: "refresh_token",
+					User:         dto.ProfileResponse{ID: 123},
+				},
 			},
 			wantErr: nil,
 		},
@@ -698,7 +715,7 @@ func TestUserHandler_ChangePassword(t *testing.T) {
 	t.Parallel()
 	testCases := []struct {
 		name       string
-		mock       func(ctrl *gomock.Controller) service.UserService
+		mock       func(ctrl *gomock.Controller) (service.UserService, jwtware.Handler)
 		req        dto.ChangePasswordRequest
 		uc         jwtware.UserClaims
 		wantResult ginx.Result
@@ -706,10 +723,12 @@ func TestUserHandler_ChangePassword(t *testing.T) {
 	}{
 		{
 			name: "修改密码成功",
-			mock: func(ctrl *gomock.Controller) service.UserService {
+			mock: func(ctrl *gomock.Controller) (service.UserService, jwtware.Handler) {
 				svc := svcmocks.NewMockUserService(ctrl)
+				jwtHdl := jwtmocks.NewMockHandler(ctrl)
 				svc.EXPECT().ChangePassword(gomock.Any(), int64(123), "OldPassword123!", "NewPassword123!").Return(nil)
-				return svc
+				jwtHdl.EXPECT().ClearToken(gomock.Any()).Return(nil)
+				return svc, jwtHdl
 			},
 			req: dto.ChangePasswordRequest{
 				OldPassword:     "OldPassword123!",
@@ -719,16 +738,16 @@ func TestUserHandler_ChangePassword(t *testing.T) {
 			uc: jwtware.UserClaims{Uid: 123},
 			wantResult: ginx.Result{
 				Code: http.StatusOK,
-				Msg:  "修改密码成功",
+				Msg:  "修改密码成功，请重新登录",
 			},
 			wantErr: nil,
 		},
 		{
 			name: "旧密码错误",
-			mock: func(ctrl *gomock.Controller) service.UserService {
+			mock: func(ctrl *gomock.Controller) (service.UserService, jwtware.Handler) {
 				svc := svcmocks.NewMockUserService(ctrl)
 				svc.EXPECT().ChangePassword(gomock.Any(), int64(123), "OldPassword123!", "NewPassword123!").Return(service.ErrInvalidUserOrPassword)
-				return svc
+				return svc, nil
 			},
 			req: dto.ChangePasswordRequest{
 				OldPassword:     "OldPassword123!",
@@ -744,9 +763,9 @@ func TestUserHandler_ChangePassword(t *testing.T) {
 		},
 		{
 			name: "两次输入密码不一致",
-			mock: func(ctrl *gomock.Controller) service.UserService {
+			mock: func(ctrl *gomock.Controller) (service.UserService, jwtware.Handler) {
 				svc := svcmocks.NewMockUserService(ctrl)
-				return svc
+				return svc, nil
 			},
 			req: dto.ChangePasswordRequest{
 				OldPassword:     "OldPassword123!",
@@ -762,9 +781,9 @@ func TestUserHandler_ChangePassword(t *testing.T) {
 		},
 		{
 			name: "新密码格式错误",
-			mock: func(ctrl *gomock.Controller) service.UserService {
+			mock: func(ctrl *gomock.Controller) (service.UserService, jwtware.Handler) {
 				svc := svcmocks.NewMockUserService(ctrl)
-				return svc
+				return svc, nil
 			},
 			req: dto.ChangePasswordRequest{
 				OldPassword:     "OldPassword123!",
@@ -774,16 +793,16 @@ func TestUserHandler_ChangePassword(t *testing.T) {
 			uc: jwtware.UserClaims{Uid: 123},
 			wantResult: ginx.Result{
 				Code: errs.UserInvalidInput,
-				Msg:  "密码必须包含数字、特殊字符、大小字母，并且长度不能小于 8 位",
+				Msg:  "密码长度至少为6位",
 			},
 			wantErr: nil,
 		},
 		{
 			name: "系统错误",
-			mock: func(ctrl *gomock.Controller) service.UserService {
+			mock: func(ctrl *gomock.Controller) (service.UserService, jwtware.Handler) {
 				svc := svcmocks.NewMockUserService(ctrl)
 				svc.EXPECT().ChangePassword(gomock.Any(), int64(123), "OldPassword123!", "NewPassword123!").Return(errors.New("service error"))
-				return svc
+				return svc, nil
 			},
 			req: dto.ChangePasswordRequest{
 				OldPassword:     "OldPassword123!",
@@ -806,8 +825,8 @@ func TestUserHandler_ChangePassword(t *testing.T) {
 			ctrl := gomock.NewController(t)
 			defer ctrl.Finish()
 
-			svc := tc.mock(ctrl)
-			h := NewUserHandler(logger.NewNopLogger(), svc, nil, nil)
+			svc, jwtHdl := tc.mock(ctrl)
+			h := NewUserHandler(logger.NewNopLogger(), svc, nil, jwtHdl)
 
 			ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 			ctx.Request = httptest.NewRequest("POST", "/users/change_password", nil)
@@ -978,7 +997,7 @@ func TestUserHandler_ResetPassword(t *testing.T) {
 			},
 			wantResult: ginx.Result{
 				Code: errs.UserInvalidInput,
-				Msg:  "密码必须包含数字、特殊字符、大小字母，并且长度不能小于 8 位",
+				Msg:  "密码长度至少为6位",
 			},
 			wantErr: nil,
 		},
@@ -1049,6 +1068,7 @@ func TestUserHandler_UploadAvatar(t *testing.T) {
 			wantResult: ginx.Result{
 				Code: http.StatusOK,
 				Msg:  "头像上传成功",
+				Data: map[string]string{"avatar": "storage/uploads/avatars/123_test_avatar.jpg"},
 			},
 			wantErr: nil,
 		},

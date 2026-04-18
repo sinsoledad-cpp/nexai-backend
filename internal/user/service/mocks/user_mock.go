@@ -156,6 +156,20 @@ func (mr *MockUserServiceMockRecorder) UpdateAvatarPath(ctx, uid, newPath any) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAvatarPath", reflect.TypeOf((*MockUserService)(nil).UpdateAvatarPath), ctx, uid, newPath)
 }
 
+// UpdateEmail mocks base method.
+func (m *MockUserService) UpdateEmail(ctx context.Context, uid int64, email string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateEmail", ctx, uid, email)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateEmail indicates an expected call of UpdateEmail.
+func (mr *MockUserServiceMockRecorder) UpdateEmail(ctx, uid, email any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateEmail", reflect.TypeOf((*MockUserService)(nil).UpdateEmail), ctx, uid, email)
+}
+
 // UpdateNonSensitiveInfo mocks base method.
 func (m *MockUserService) UpdateNonSensitiveInfo(ctx context.Context, user domain.User) error {
 	m.ctrl.T.Helper()
@@ -168,4 +182,18 @@ func (m *MockUserService) UpdateNonSensitiveInfo(ctx context.Context, user domai
 func (mr *MockUserServiceMockRecorder) UpdateNonSensitiveInfo(ctx, user any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNonSensitiveInfo", reflect.TypeOf((*MockUserService)(nil).UpdateNonSensitiveInfo), ctx, user)
+}
+
+// UpdatePhone mocks base method.
+func (m *MockUserService) UpdatePhone(ctx context.Context, uid int64, phone string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdatePhone", ctx, uid, phone)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdatePhone indicates an expected call of UpdatePhone.
+func (mr *MockUserServiceMockRecorder) UpdatePhone(ctx, uid, phone any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdatePhone", reflect.TypeOf((*MockUserService)(nil).UpdatePhone), ctx, uid, phone)
 }
