@@ -43,6 +43,7 @@ var codeSvc = wire.NewSet(
 
 var resumeSvc = wire.NewSet(
 	resumedao.NewGORMResumeDAO,
+	resumedao.NewGORMResumeVersionDAO,
 	resumerepo.NewCachedResumeRepository,
 	ioc2.InitChatModel,
 	resumeservice.NewParseWorkflow,

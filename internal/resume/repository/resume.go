@@ -17,10 +17,13 @@ var (
 type ResumeRepository interface {
 	Create(ctx context.Context, resume domain.Resume) (domain.Resume, error)
 	FindById(ctx context.Context, id int64) (domain.Resume, error)
+	FindByUserId(ctx context.Context, userId int64) ([]domain.Resume, error)
 	UpdateStatus(ctx context.Context, id int64, status domain.ResumeStatus) error
 	UpdateParsed(ctx context.Context, id int64, parsed domain.ParsedResume) error
 	UpdateRawText(ctx context.Context, id int64, rawText string) error
 	UpdateScore(ctx context.Context, id int64, score domain.ScoreResult) error
+	UpdateOptimization(ctx context.Context, id int64, optimization domain.OptimizationResult) error
+	Delete(ctx context.Context, id int64) error
 }
 
 type CachedResumeRepository struct {
@@ -54,6 +57,18 @@ func (c *CachedResumeRepository) FindById(ctx context.Context, id int64) (domain
 	return c.toDomain(r), nil
 }
 
+func (c *CachedResumeRepository) FindByUserId(ctx context.Context, userId int64) ([]domain.Resume, error) {
+	resumes, err := c.dao.FindByUserId(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]domain.Resume, 0, len(resumes))
+	for _, r := range resumes {
+		result = append(result, c.toDomain(r))
+	}
+	return result, nil
+}
+
 func (c *CachedResumeRepository) UpdateStatus(ctx context.Context, id int64, status domain.ResumeStatus) error {
 	return c.dao.UpdateStatus(ctx, id, int(status))
 }
@@ -78,22 +93,41 @@ func (c *CachedResumeRepository) UpdateScore(ctx context.Context, id int64, scor
 	return c.dao.UpdateScore(ctx, id, string(data), int(domain.StatusScored))
 }
 
+func (c *CachedResumeRepository) UpdateOptimization(ctx context.Context, id int64, optimization domain.OptimizationResult) error {
+	data, err := json.Marshal(optimization)
+	if err != nil {
+		return err
+	}
+	return c.dao.UpdateOptimization(ctx, id, string(data))
+}
+
+func (c *CachedResumeRepository) Delete(ctx context.Context, id int64) error {
+	return c.dao.Delete(ctx, id)
+}
+
 func (c *CachedResumeRepository) toEntity(r domain.Resume) dao.Resume {
 	parsed, _ := json.Marshal(r.Parsed)
-	score, _ := json.Marshal(domain.ScoreResult{})
-	if r.Status == domain.StatusScored {
-		score, _ = json.Marshal(r.Parsed)
+	var score string
+	if r.Score.OverallScore > 0 {
+		scoreBytes, _ := json.Marshal(r.Score)
+		score = string(scoreBytes)
+	}
+	var optimization string
+	if len(r.Optimization.Diagnoses) > 0 || r.Optimization.JdMatch.MatchScore > 0 {
+		optBytes, _ := json.Marshal(r.Optimization)
+		optimization = string(optBytes)
 	}
 	return dao.Resume{
-		ID:       r.ID,
-		UserID:   r.UserID,
-		FileName: r.FileName,
-		FileURL:  r.FileURL,
-		FileType: r.FileType,
-		RawText:  r.RawText,
-		Parsed:   string(parsed),
-		Status:   int(r.Status),
-		Score:    string(score),
+		ID:           r.ID,
+		UserID:       r.UserID,
+		FileName:     r.FileName,
+		FileURL:      r.FileURL,
+		FileType:     r.FileType,
+		RawText:      r.RawText,
+		Parsed:       string(parsed),
+		Status:       int(r.Status),
+		Score:        score,
+		Optimization: optimization,
 	}
 }
 
@@ -102,16 +136,26 @@ func (c *CachedResumeRepository) toDomain(r dao.Resume) domain.Resume {
 	if r.Parsed != "" {
 		_ = json.Unmarshal([]byte(r.Parsed), &parsed)
 	}
+	var score domain.ScoreResult
+	if r.Score != "" {
+		_ = json.Unmarshal([]byte(r.Score), &score)
+	}
+	var optimization domain.OptimizationResult
+	if r.Optimization != "" {
+		_ = json.Unmarshal([]byte(r.Optimization), &optimization)
+	}
 	return domain.Resume{
-		ID:       r.ID,
-		UserID:   r.UserID,
-		FileName: r.FileName,
-		FileURL:  r.FileURL,
-		FileType: r.FileType,
-		RawText:  r.RawText,
-		Parsed:   parsed,
-		Status:   domain.ResumeStatus(r.Status),
-		Ctime:    time.UnixMilli(r.Ctime),
-		Utime:    time.UnixMilli(r.Utime),
+		ID:           r.ID,
+		UserID:       r.UserID,
+		FileName:     r.FileName,
+		FileURL:      r.FileURL,
+		FileType:     r.FileType,
+		RawText:      r.RawText,
+		Parsed:       parsed,
+		Score:        score,
+		Optimization: optimization,
+		Status:       domain.ResumeStatus(r.Status),
+		Ctime:        time.UnixMilli(r.Ctime),
+		Utime:        time.UnixMilli(r.Utime),
 	}
 }

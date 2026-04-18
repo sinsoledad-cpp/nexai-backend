@@ -7,6 +7,16 @@ type UploadResponse struct {
 	FileType string `json:"fileType"` // 文件类型
 }
 
+// ResumeListItem 简历列表项
+type ResumeListItem struct {
+	ID       int64  `json:"id"`       // 简历ID
+	FileName string `json:"fileName"` // 文件名
+	FileType string `json:"fileType"` // 文件类型
+	Status   int    `json:"status"`   // 状态
+	Ctime    int64  `json:"ctime"`    // 创建时间（毫秒时间戳）
+	Utime    int64  `json:"utime"`    // 更新时间（毫秒时间戳）
+}
+
 // ParseRequest 解析请求
 type ParseRequest struct {
 	FileID int64 `json:"fileId" binding:"required"` // 文件ID

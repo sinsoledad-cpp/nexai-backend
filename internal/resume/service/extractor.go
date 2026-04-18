@@ -29,10 +29,8 @@ func (e *TextExtractor) Extract(fileType string, data []byte) (string, error) {
 	switch fileType {
 	case ".pdf":
 		return e.extractFromPDF(data)
-	case ".docx", ".doc":
+	case ".docx":
 		return e.extractFromDOCX(data)
-	case ".png", ".jpg", ".jpeg":
-		return e.extractFromImage(data)
 	default:
 		return "", ErrFileTypeUnsupported
 	}

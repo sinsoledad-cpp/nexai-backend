@@ -4,16 +4,18 @@ import "time"
 
 // Resume 简历实体
 type Resume struct {
-	ID       int64        // 简历ID
-	UserID   int64        // 用户ID
-	FileName string       // 文件名
-	FileURL  string       // 文件存储路径
-	FileType string       // 文件类型（.pdf, .docx, .jpg等）
-	RawText  string       // 提取的原始文本
-	Parsed   ParsedResume // 解析后的结构化数据
-	Status   ResumeStatus // 简历状态
-	Ctime    time.Time    // 创建时间
-	Utime    time.Time    // 更新时间
+	ID           int64              // 简历ID
+	UserID       int64              // 用户ID
+	FileName     string             // 文件名
+	FileURL      string             // 文件存储路径
+	FileType     string             // 文件类型（.pdf, .docx等）
+	RawText      string             // 提取的原始文本
+	Parsed       ParsedResume       // 解析后的结构化数据
+	Score        ScoreResult        // 评分结果
+	Optimization OptimizationResult // 优化结果
+	Status       ResumeStatus       // 简历状态
+	Ctime        time.Time          // 创建时间
+	Utime        time.Time          // 更新时间
 }
 
 // ResumeStatus 简历状态枚举
@@ -75,4 +77,12 @@ type Project struct {
 // SkillItem 技能描述项
 type SkillItem struct {
 	Description string `json:"description"` // 技能描述（如：熟练掌握golang编程语言，了解GMP模型以及GC机制）
+}
+
+// ResumeVersion 简历版本历史
+type ResumeVersion struct {
+	ID       int64        // 版本ID
+	ResumeID int64        // 简历ID
+	Parsed   ParsedResume // 该版本的解析数据
+	Ctime    time.Time    // 创建时间
 }

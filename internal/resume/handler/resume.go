@@ -40,12 +40,15 @@ func (h *ResumeHandler) RegisterRoutes(e *gin.Engine) {
 	v1 := e.Group("/v1")
 	resumes := v1.Group("/resumes")
 
-	resumes.POST("/upload", ginx.WrapClaims(h.Upload))   // 上传简历
-	resumes.POST("/parse", ginx.WrapBody(h.Parse))       // 解析简历
-	resumes.POST("/correct", ginx.WrapBody(h.Correct))   // 修正简历
-	resumes.POST("/score", ginx.WrapBody(h.Score))       // 评分简历
-	resumes.POST("/optimize", ginx.WrapBody(h.Optimize)) // 优化建议
-	resumes.GET("/:id", ginx.Wrap(h.GetById))            // 获取简历
+	resumes.POST("/upload", ginx.WrapClaims(h.Upload))
+	resumes.POST("/parse", ginx.WrapBodyAndClaims(h.Parse))
+	resumes.POST("/correct", ginx.WrapBodyAndClaims(h.Correct))
+	resumes.POST("/score", ginx.WrapBodyAndClaims(h.Score))
+	resumes.POST("/optimize", ginx.WrapBodyAndClaims(h.Optimize))
+	resumes.GET("/:id", ginx.WrapClaims(h.GetById))
+	resumes.GET("/:id/export", ginx.WrapClaims(h.Export))
+	resumes.GET("", ginx.WrapClaims(h.List))
+	resumes.DELETE("/:id", ginx.WrapClaims(h.Delete))
 }
 
 // Upload 处理文件上传
@@ -61,10 +64,10 @@ func (h *ResumeHandler) Upload(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result
 
 	// 检查文件类型
 	ext := strings.ToLower(filepath.Ext(header.Filename))
-	if ext != ".pdf" && ext != ".docx" && ext != ".doc" && ext != ".png" && ext != ".jpg" && ext != ".jpeg" {
+	if ext != ".pdf" && ext != ".docx" {
 		return ginx.Result{
 			Code: errs.ResumeFileTypeUnsupported,
-			Msg:  "不支持的文件类型，请上传 PDF、DOCX 或图片文件",
+			Msg:  "不支持的文件类型，请上传 PDF 或 DOCX 文件",
 		}, nil
 	}
 
@@ -118,8 +121,8 @@ func (h *ResumeHandler) Upload(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result
 }
 
 // Parse 处理简历解析
-func (h *ResumeHandler) Parse(ctx *gin.Context, req dto.ParseRequest) (ginx.Result, error) {
-	parsed, err := h.svc.Parse(ctx.Request.Context(), 0, req.FileID)
+func (h *ResumeHandler) Parse(ctx *gin.Context, req dto.ParseRequest, uc jwt.UserClaims) (ginx.Result, error) {
+	parsed, err := h.svc.Parse(ctx.Request.Context(), uc.Uid, req.FileID)
 	if err != nil {
 		if errors.Is(err, resumeservice.ErrResumeNotFound) {
 			return ginx.Result{
@@ -147,9 +150,9 @@ func (h *ResumeHandler) Parse(ctx *gin.Context, req dto.ParseRequest) (ginx.Resu
 }
 
 // Correct 处理简历修正
-func (h *ResumeHandler) Correct(ctx *gin.Context, req dto.CorrectRequest) (ginx.Result, error) {
+func (h *ResumeHandler) Correct(ctx *gin.Context, req dto.CorrectRequest, uc jwt.UserClaims) (ginx.Result, error) {
 	parsed := h.toDomainParsed(req.Parsed)
-	result, err := h.svc.Correct(ctx.Request.Context(), 0, req.FileID, parsed)
+	result, err := h.svc.Correct(ctx.Request.Context(), uc.Uid, req.FileID, parsed)
 	if err != nil {
 		if errors.Is(err, resumeservice.ErrResumeNotFound) {
 			return ginx.Result{
@@ -171,8 +174,8 @@ func (h *ResumeHandler) Correct(ctx *gin.Context, req dto.CorrectRequest) (ginx.
 }
 
 // Score 处理简历评分
-func (h *ResumeHandler) Score(ctx *gin.Context, req dto.ScoreRequest) (ginx.Result, error) {
-	result, err := h.svc.Score(ctx.Request.Context(), 0, req.FileID, req.TargetPosition)
+func (h *ResumeHandler) Score(ctx *gin.Context, req dto.ScoreRequest, uc jwt.UserClaims) (ginx.Result, error) {
+	result, err := h.svc.Score(ctx.Request.Context(), uc.Uid, req.FileID, req.TargetPosition)
 	if err != nil {
 		if errors.Is(err, resumeservice.ErrResumeNotFound) {
 			return ginx.Result{
@@ -200,7 +203,7 @@ func (h *ResumeHandler) Score(ctx *gin.Context, req dto.ScoreRequest) (ginx.Resu
 }
 
 // GetById 根据ID获取简历
-func (h *ResumeHandler) GetById(ctx *gin.Context) (ginx.Result, error) {
+func (h *ResumeHandler) GetById(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result, error) {
 	idStr := ctx.Param("id")
 	var id int64
 	_, err := fmt.Sscanf(idStr, "%d", &id)
@@ -233,8 +236,8 @@ func (h *ResumeHandler) GetById(ctx *gin.Context) (ginx.Result, error) {
 }
 
 // Optimize 处理优化建议
-func (h *ResumeHandler) Optimize(ctx *gin.Context, req dto.OptimizeRequest) (ginx.Result, error) {
-	result, err := h.svc.Optimize(ctx.Request.Context(), 0, req.FileID, req.TargetPosition, req.JD)
+func (h *ResumeHandler) Optimize(ctx *gin.Context, req dto.OptimizeRequest, uc jwt.UserClaims) (ginx.Result, error) {
+	result, err := h.svc.Optimize(ctx.Request.Context(), uc.Uid, req.FileID, req.TargetPosition, req.JD)
 	if err != nil {
 		if errors.Is(err, resumeservice.ErrResumeNotFound) {
 			return ginx.Result{
@@ -435,4 +438,101 @@ func (h *ResumeHandler) toOptimizeResponse(result domain.OptimizationResult) dto
 			GapAnalysis:   gapAnalysis,
 		},
 	}
+}
+
+func (h *ResumeHandler) List(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result, error) {
+	resumes, err := h.svc.List(ctx.Request.Context(), uc.Uid)
+	if err != nil {
+		return ginx.Result{
+			Code: errs.ResumeInternalServerError,
+			Msg:  "系统错误",
+		}, err
+	}
+
+	items := make([]dto.ResumeListItem, 0, len(resumes))
+	for _, r := range resumes {
+		items = append(items, dto.ResumeListItem{
+			ID:       r.ID,
+			FileName: r.FileName,
+			FileType: r.FileType,
+			Status:   int(r.Status),
+			Ctime:    r.Ctime.UnixMilli(),
+			Utime:    r.Utime.UnixMilli(),
+		})
+	}
+
+	return ginx.Result{
+		Code: http.StatusOK,
+		Msg:  "获取成功",
+		Data: items,
+	}, nil
+}
+
+func (h *ResumeHandler) Delete(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result, error) {
+	idStr := ctx.Param("id")
+	var id int64
+	_, err := fmt.Sscanf(idStr, "%d", &id)
+	if err != nil {
+		return ginx.Result{
+			Code: errs.ResumeInvalidInput,
+			Msg:  "无效的简历ID",
+		}, err
+	}
+
+	err = h.svc.Delete(ctx.Request.Context(), uc.Uid, id)
+	if err != nil {
+		if errors.Is(err, resumeservice.ErrResumeNotFound) {
+			return ginx.Result{
+				Code: errs.ResumeFileNotFound,
+				Msg:  "简历不存在",
+			}, err
+		}
+		return ginx.Result{
+			Code: errs.ResumeInternalServerError,
+			Msg:  "删除失败",
+		}, err
+	}
+
+	return ginx.Result{
+		Code: http.StatusOK,
+		Msg:  "删除成功",
+	}, nil
+}
+
+func (h *ResumeHandler) Export(ctx *gin.Context, uc jwt.UserClaims) (ginx.Result, error) {
+	idStr := ctx.Param("id")
+	var id int64
+	_, err := fmt.Sscanf(idStr, "%d", &id)
+	if err != nil {
+		return ginx.Result{
+			Code: errs.ResumeInvalidInput,
+			Msg:  "无效的简历ID",
+		}, err
+	}
+
+	markdown, err := h.svc.ExportMarkdown(ctx.Request.Context(), uc.Uid, id)
+	if err != nil {
+		if errors.Is(err, resumeservice.ErrResumeNotFound) {
+			return ginx.Result{
+				Code: errs.ResumeFileNotFound,
+				Msg:  "简历不存在",
+			}, err
+		}
+		if errors.Is(err, resumeservice.ErrNotParsed) {
+			return ginx.Result{
+				Code: errs.ResumeNotParsed,
+				Msg:  "简历尚未解析",
+			}, err
+		}
+		return ginx.Result{
+			Code: errs.ResumeInternalServerError,
+			Msg:  "导出失败",
+		}, err
+	}
+
+	return ginx.Result{
+		Code: http.StatusOK,
+		Msg:  "导出成功",
+		Data: map[string]string{"content": markdown},
+	}, nil
 }

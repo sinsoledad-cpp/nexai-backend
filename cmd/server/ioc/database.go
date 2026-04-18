@@ -11,5 +11,6 @@ func InitDatabase(db *gorm.DB) error {
 	return db.AutoMigrate(
 		&dao.User{},
 		&resumedao.Resume{},
+		&resumedao.ResumeVersion{},
 	)
 }

@@ -53,8 +53,9 @@ func InitApp() *App {
 		panic(err)
 	}
 	resumeDAO := resumedao.NewGORMResumeDAO(db)
+	resumeVersionDAO := resumedao.NewGORMResumeVersionDAO(db)
 	resumeRepository := resumerepo.NewCachedResumeRepository(resumeDAO, logger)
-	resumeService := resumeservice.NewResumeService(logger, resumeRepository, parseWorkflow, scoringWorkflow, optimizationWorkflow)
+	resumeService := resumeservice.NewResumeService(logger, resumeRepository, resumeVersionDAO, parseWorkflow, scoringWorkflow, optimizationWorkflow)
 	resumeHandler := resumehandler.NewResumeHandler(logger, resumeService)
 	engine := ioc.InitWebEngine(v, logger, userHandler, resumeHandler)
 	app := &App{
